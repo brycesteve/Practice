@@ -27,6 +27,16 @@ enum Exercise: Codable, Equatable {
     case ninetyNinety (duration: Duration, side: Handedness)
     case qlStraddle (duration: Duration, side: Handedness)
     
+    case elevatedPushUp (reps: Int)
+    case pullUp (reps: Int)
+    
+    case deepSquatHold (duration: Duration)
+    case hipFlexorStretch (duration: Duration, side: Handedness)
+    case hamstringStretch (duration: Duration, side: Handedness)
+    case splits (duration: Duration)
+    case bridge (duration: Duration)
+    case hang(duration: Duration)
+    
     static var metadataKey: String { "net.stevebryce.ExerciseMeta" }
     
     var name: String {
@@ -44,6 +54,22 @@ enum Exercise: Codable, Equatable {
         case .rest: "Rest"
         case .ninetyNinety: "90 90 Stretch"
         case .qlStraddle: "QL Straddle"
+        case .elevatedPushUp:
+            "Decline Pushup"
+        case .pullUp:
+            "Pull up"
+        case .deepSquatHold:
+            "Squat Hold"
+        case .hipFlexorStretch:
+            "Hip Flexor Stretch"
+        case .hamstringStretch:
+            "Hamstring Stretch"
+        case .splits:
+            "Splits"
+        case .bridge:
+            "Bridge"
+        case .hang:
+            "Bar Hang"
         }
     }
  
@@ -51,14 +77,23 @@ enum Exercise: Codable, Equatable {
         switch self {
         case let .squat(reps, _),
         let .hipRaise(reps),
-        let .halo(reps, _):
+        let .halo(reps, _),
+        let .pullUp(reps),
+        let .elevatedPushUp(reps):
             return "\(reps)x " + self.name
         case let .swing(reps, _, hand),
         let .getUp(reps, _, hand):
             return "\(reps)x " + self.name + " - \(hand)"
+        case let .hamstringStretch(_, side),
+            let .hipFlexorStretch(_,side):
+            return "\(self.name) - \(side)"
         case .rest,
         .ninetyNinety,
-        .qlStraddle:
+        .deepSquatHold,
+        .splits,
+        .bridge,
+        .qlStraddle,
+        .hang:
             return self.name
         }
     }
@@ -86,6 +121,14 @@ enum Exercise: Codable, Equatable {
         case rest = "rest"
         case ninetyNinety = "ninetyNinety"
         case qlStraddle = "qlStraddle"
+        case deepSquatHold = "deepSquatHold"
+        case pullUp = "pullUp"
+        case elevatedPushUp = "elevatedPushUp"
+        case hipFlexorStretch = "hipFlexorStretch"
+        case hamstringStretch = "hamstringStretch"
+        case splits = "splits"
+        case bridge = "bridge"
+        case hang = "hang"
     }
     
     static func from(_ activity: HKWorkoutActivity) -> Self? {

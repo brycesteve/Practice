@@ -6,11 +6,13 @@
 //
 import SwiftUI
 import HealthKit
+import OSLog
 
 struct DashboardView: View {
     @State var practices: [HKWorkout] = []
     @Environment(\.scenePhase) var scenePhase
     @Environment(HistoryManager.self) var historyManager
+    @Environment(GlobalLoadingState.self) var loadingState
     
     var body: some View {
         NavigationStack {
@@ -56,6 +58,10 @@ struct DashboardView: View {
                .listSectionSeparator(.hidden)
                .listRowInsets(.vertical, 8)
                
+               ProgressGraphView(data: practiceData())
+                   .listRowSeparator(.hidden)
+                   .listSectionSeparator(.hidden)
+                   .listRowInsets(.vertical, 8)
             }
            .scrollContentBackground(.hidden)
            .listStyle(.plain)
@@ -76,8 +82,10 @@ struct DashboardView: View {
     }
     
     private func updatePractices() async {
+        loadingState.dashboardLoading = true
         let startDate = Calendar.autoupdatingCurrent.date(from: DateComponents(year: 2025))!
         practices = await historyManager.getPractices(from: startDate, to: Date())
+        loadingState.dashboardLoading = false
     }
     
     func totalMass() -> Measurement<UnitMass> {
@@ -87,6 +95,16 @@ struct DashboardView: View {
         }
         
         return Measurement(value: Double(mass), unit: UnitMass.kilograms)
+    }
+    
+    func practiceData() -> [PracticeVolume] {
+        let data = practices.filter{
+            $0.simpleAndSinisterWeight > 0
+        }.map {
+            PracticeVolume(weight: $0.simpleAndSinisterWeight, date: $0.startDate)
+        }
+        Logger.default.debug("Practice Data: \(data)")
+        return data
     }
     
     func currentStreak() -> Streak {

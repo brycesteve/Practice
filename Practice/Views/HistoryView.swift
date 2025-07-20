@@ -59,8 +59,8 @@ struct HistoryView: View {
                             }
                             .listRowSeparator(.hidden)
                             .listSectionSeparator(.hidden)
-
                             .listRowBackground(Color.clear)
+                            .listRowInsets(.vertical, 8)
                         }
                     }
 

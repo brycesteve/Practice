@@ -97,8 +97,8 @@ extension Collection where Element == HKWorkout {
     func calculateLongestComplianceWorkoutStreak() -> Streak {
         let restDays = 2
         let calendar = Calendar.autoupdatingCurrent
-        let workoutDays = self
-            .map { calendar.startOfDay(for: $0.startDate) }
+        let workoutDays = Set(self
+            .map { calendar.startOfDay(for: $0.startDate) })
             .sorted()
 
         guard !workoutDays.isEmpty else { return Streak(length: 0, start: nil, end: nil) }
@@ -155,8 +155,8 @@ extension Collection where Element == HKWorkout {
         let maxRestDaysPer7 = 2
         let calendar = Calendar.current
 
-        let workoutDays = self
-            .map { calendar.startOfDay(for: $0.startDate) }
+        let workoutDays = Set(self
+            .map { calendar.startOfDay(for: $0.startDate) })
             .sorted()
         
         let referenceDate = Date()

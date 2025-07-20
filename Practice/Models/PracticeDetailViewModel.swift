@@ -25,6 +25,9 @@ class PracticeDetailViewModel {
             }
             
         }
+        if let energy = workout.statistics(for: .quantityType(forIdentifier: .activeEnergyBurned)!) {
+            self.totalActiveEnergy = energy.sumQuantity()?.doubleValue(for: .largeCalorie()) ?? 0
+        }
     }
     var practice: Practice?
     var name: String {
@@ -40,6 +43,8 @@ class PracticeDetailViewModel {
         })
     }
     var date: Date!
+    
+    var totalActiveEnergy: Double = 0
 }
 
 struct PracticeSetViewModel {

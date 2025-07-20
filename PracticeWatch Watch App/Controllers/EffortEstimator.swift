@@ -128,7 +128,7 @@ class EffortScoreEstimator {
     func saveEffortScoreToHealthKit(score: Double, for workout: HKWorkout, using healthStore: HKHealthStore) async throws {
         let effort = HKQuantitySample(
             type: HKQuantityType.quantityType(forIdentifier: .estimatedWorkoutEffortScore)!,
-            quantity: HKQuantity(unit: .appleEffortScore(), doubleValue: score), 
+            quantity: HKQuantity(unit: .appleEffortScore(), doubleValue: score),
             start: workout.startDate,
             end: workout.endDate
         )

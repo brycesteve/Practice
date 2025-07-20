@@ -61,7 +61,7 @@ class HistoryManager {
     func getHeartRateRange(for workout: HKWorkout) async -> (low: Double, high: Double) {
         
         let heartRateType = HKQuantityType(.heartRate)
-        let predicate = HKQuery.predicateForObjects(from: workout)
+        //let predicate = HKQuery.predicateForObjects(from: workout)
         
         let stat = workout.statistics(for: heartRateType)
         let lowHR = stat?.minimumQuantity()?.doubleValue(for: .count().unitDivided(by: .minute()))

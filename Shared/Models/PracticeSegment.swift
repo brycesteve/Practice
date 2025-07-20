@@ -36,14 +36,20 @@ enum SimpleSinisterStretchesSegment: PracticeSegment {
         switch self {
         case .stretches:
             return [
+                Exercise.deepSquatHold(duration: .seconds(120)),
                 Exercise.ninetyNinety(duration: .seconds(60), side: .left),
                 Exercise.ninetyNinety(duration: .seconds(60), side: .right),
                 Exercise.qlStraddle(duration: .seconds(60), side: .left),
                 Exercise.qlStraddle(duration: .seconds(60), side: .right),
-                Exercise.ninetyNinety(duration: .seconds(60), side: .left),
-                Exercise.ninetyNinety(duration: .seconds(60), side: .right),
-                Exercise.qlStraddle(duration: .seconds(60), side: .left),
-                Exercise.qlStraddle(duration: .seconds(60), side: .right)
+                Exercise.hipFlexorStretch(duration: .seconds(60), side: .left),
+                Exercise.hipFlexorStretch(duration: .seconds(60), side: .right),
+                Exercise.hamstringStretch(duration: .seconds(60), side: .left),
+                Exercise.hamstringStretch(duration: .seconds(60), side: .right),
+                Exercise.splits(duration: .seconds(120)),
+                Exercise.bridge(duration: .seconds(30)),
+                Exercise.hang(duration: .seconds(30)),
+                Exercise.rest,
+                Exercise.hang(duration: .seconds(30))
             ]
         }
     }
@@ -55,12 +61,16 @@ enum SimpleSinisterSegment: PracticeSegment {
     case warmUp
     case swings
     case getUps
+    case push
+    case pull
     
     static var segmentOrder: [String: Int] {
         return [
             "Warm Up": 0,
             "Swings": 1,
-            "Get Ups": 2
+            "Get Ups": 2,
+            "Push": 3,
+            "Pull": 4
         ]
     }
     
@@ -72,6 +82,10 @@ enum SimpleSinisterSegment: PracticeSegment {
             return "Swings"
         case .getUps:
             return "Get Ups"
+        case .push:
+            return "Push"
+        case .pull:
+            return "Pull"
         }
     }
     
@@ -99,7 +113,21 @@ enum SimpleSinisterSegment: PracticeSegment {
                 Exercise.rest,
                 Exercise.getUp(reps: 1, weight: UserDefaults.standard.integer(forKey: Exercise.CodingKeys.getUp.rawValue), hand: .right),
                 Exercise.rest
-            ], count: 5).flatMap { $0 }.dropLast()
+            ], count: 5).flatMap { $0 }
+            
+        case .push:
+            // TODO: Add reps to settings
+            return [[Exercise]](repeating: [
+                Exercise.elevatedPushUp(reps: 10),
+                Exercise.rest
+            ], count: 3).flatMap { $0 }
+            
+        case .pull:
+            // TODO: Add reps to settings
+            return [[Exercise]](repeating: [
+                Exercise.pullUp(reps: 5),
+                Exercise.rest
+            ], count: 3).flatMap { $0 }.dropLast()
         }
     }
 }

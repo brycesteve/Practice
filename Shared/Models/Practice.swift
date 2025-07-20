@@ -34,7 +34,10 @@ enum Practice: String, Codable, CaseIterable {
     
     
     var name: String {
-        self.rawValue
+        switch self {
+        case .SimpleAndSinister: return "Simple and Sinister+"
+        case .SimpleAndSinisterStretches: return "Stretches"
+        }
     }
     
     var segments: [PracticeSegment] {
@@ -43,10 +46,12 @@ enum Practice: String, Codable, CaseIterable {
             return [
                 SimpleSinisterSegment.warmUp,
                 SimpleSinisterSegment.swings,
-                SimpleSinisterSegment.getUps
+                SimpleSinisterSegment.getUps,
+                SimpleSinisterSegment.push,
+                SimpleSinisterSegment.pull
             ]
         case .SimpleAndSinisterStretches:
-            return []
+            return [SimpleSinisterStretchesSegment.stretches]
         }
     }
     

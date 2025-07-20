@@ -13,7 +13,17 @@ struct PracticeDetailView: View {
     var body: some View {
         List {
             Section {
-            
+                DashboardCard(
+                    title: "Active Energy",
+                    value: "\(practice.totalActiveEnergy.formatted(.number.precision(.fractionLength(0)))) kcal",
+                    icon: "flame.fill",
+                    color: .orange)
+                .listRowSeparator(.hidden)
+                .listSectionSeparator(.hidden)
+                .listRowInsets(.vertical, 8)
+            //TODO: Duration (Total/Work/Rest)
+            //TODO: Heart Rate avg/max
+            //TODO: If weight, total weight moved
             }
             header: {
                 Text("Stats")
@@ -21,9 +31,8 @@ struct PracticeDetailView: View {
             .headerProminence(.increased)
             ForEach(practice.segments, id: \.name) { segment in
                 Section {
-                    ForEach(segment.sets.enumerated(), id: \.offset) { _,set in
-                        Text(set.description)
-                    }
+                    EmptyView()
+                    // TODO: Stats for segment
                 }
                 header: {
                     Text(segment.name)
@@ -31,6 +40,8 @@ struct PracticeDetailView: View {
             }
             
         }
+        .scrollContentBackground(.hidden)
+        .listStyle(.plain)
         .navigationTitle(practice.name)
         .navigationSubtitle(practice.date.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.large)

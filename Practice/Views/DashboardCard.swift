@@ -7,6 +7,8 @@
 import SwiftUI
 
 struct DashboardCard: View {
+    @Environment(GlobalLoadingState.self) var loadingState
+    
     let title: String
     let value: String
     let icon: String
@@ -27,9 +29,15 @@ struct DashboardCard: View {
             VStack(alignment: .leading) {
                 Text(title)
                     .font(.headline)
-                Text(value)
-                    .font(.title2)
-                    .bold()
+                if loadingState.dashboardLoading {
+                    ProgressView()
+                        .padding(.leading, 8)
+                }
+                else {
+                    Text(value)
+                        .font(.title2)
+                        .bold()
+                }
             }
 
             Spacer()
@@ -42,20 +50,28 @@ struct DashboardCard: View {
 }
 
 #Preview {
+    @Previewable @State var loadingState = GlobalLoadingState()
     DashboardCard(title: "Test", value: "Value", icon: "calendar", color: .primary)
+        .environment(loadingState)
+        .onAppear {
+            loadingState.dashboardLoading = true
+        }
 }
 
 #Preview {
+    @Previewable @State var loadingState = GlobalLoadingState()
     @Previewable @State var longestStreak = Streak(length: 5, start: Calendar.current.date(from: DateComponents(year:2025, month: 7, day: 17)), end: Calendar.current.date(from: DateComponents(year: 2025, month: 7, day: 20)))
     SummaryCardView(title: "Longest Streak",
                     icon: "trophy.fill",
                     value: "\(longestStreak.length) days",
                     dateRange: longestStreak.dateRange,
                     color: longestStreak.length > 0 ? .yellow : .gray)
+    .environment(loadingState)
 }
 
 
 struct SummaryCardView: View {
+    @Environment(GlobalLoadingState.self) var loadingState
     let title: String
     let icon: String
     let value: String
@@ -74,12 +90,18 @@ struct SummaryCardView: View {
             VStack(alignment: .leading) {
                 Text(title)
                     .font(.headline)
-                Text(value)
-                    .font(.title2)
-                    .bold()
-                Text(dateRange)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                if loadingState.dashboardLoading {
+                    ProgressView()
+                        .padding(.leading, 8)
+                }
+                else {
+                    Text(value)
+                        .font(.title2)
+                        .bold()
+                    Text(dateRange)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
             }
 
             Spacer()

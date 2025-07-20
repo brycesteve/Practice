@@ -11,10 +11,11 @@ import OSLog
 @main
 struct PracticeApp: App {
     @Bindable var historyManager = HistoryManager()
+    @State var globalState = GlobalLoadingState()
     var body: some Scene {
         WindowGroup {
             TabView {
-                Tab("Dashboard", systemImage: "house") {
+                Tab("Dashboard", systemImage: "rectangle.stack.fill") {
                     DashboardView()
                 }
                 Tab("History", systemImage: "calendar") {
@@ -23,6 +24,7 @@ struct PracticeApp: App {
             }
             .tint(.green)
             .environment(historyManager)
+            .environment(globalState)
             .onAppear {
                 Task {
                     do {

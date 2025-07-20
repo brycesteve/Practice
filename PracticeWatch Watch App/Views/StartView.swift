@@ -39,13 +39,14 @@ struct StartView: View {
                         Text(practice.name)
                     }
                 }
+                .padding(.vertical)
+                
                 
             }
             
             .navigationDestination(isPresented: $manager.running, destination: {
                 SessionPagingView()
             })
-            
             
             .listStyle(.carousel)
             .navigationBarTitle("Practice")
