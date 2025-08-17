@@ -9,6 +9,7 @@ import SwiftUI
 import Foundation
 import HealthKit
 
+@MainActor
 @Observable
 class PracticeSummary {
     init(from workout: HKWorkout) {
@@ -19,7 +20,7 @@ class PracticeSummary {
                 if let practice = Practice(rawValue: name) {
                     self.practice = practice
                     
-                    let historyManager = HistoryManager()
+                    let historyManager = HistoryManager.shared
                     Task {
                         let range = await historyManager.getHeartRateRange(for: workout)
                         self.heartRateRange = "\(range.low.formatted(.number.precision(.fractionLength(0))))-\(range.high.formatted(.number.precision(.fractionLength(0))))"

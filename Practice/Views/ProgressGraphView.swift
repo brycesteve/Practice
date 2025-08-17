@@ -7,12 +7,7 @@
 import SwiftUI
 import Charts
 
-struct PracticeVolume: Identifiable {
-    var id: UUID = UUID()
-    var weight: Int
-    var date: Date
-    
-}
+
 
 struct ProgressGraphView: View {
     var data: [PracticeVolume]

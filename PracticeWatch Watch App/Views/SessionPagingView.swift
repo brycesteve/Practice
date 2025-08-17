@@ -46,6 +46,6 @@ struct SessionPagingView: View {
 
 struct PagingView_Previews: PreviewProvider {
     static var previews: some View {
-        SessionPagingView().environment(PracticeManager())
+        SessionPagingView().environment(PracticeManager.shared)
     }
 }

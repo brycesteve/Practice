@@ -19,10 +19,6 @@ struct SimpleSinisterSettingsView: View {
     
     @AppStorage(UserDefaults.twoHandedSwingsKey) var twoHandedSwings: Bool = false
     
-    @Environment(\.dismiss) var dismiss
-    @Environment(PracticeManager.self) var workoutManager
-    
-    
     
     var body: some View {
         //NavigationStack {
@@ -60,7 +56,7 @@ struct SimpleSinisterSettingsView: View {
                     Text("Practice")
                 }
             }
-            .toolbar {
+            //.toolbar {
 //                ToolbarItem(placement: .cancellationAction) {
 //                    Button(role: .cancel, action: {
 //                        dismiss()
@@ -68,19 +64,19 @@ struct SimpleSinisterSettingsView: View {
 //                        Label("Back", systemImage: "arrow.backward")
 //                    }
 //                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(role: .none, action: {
-                        DispatchQueue.main.async {
-                            dismiss()
-                            workoutManager.startCountdown()
-                        }
-                    }) {
-                        Label("Start", systemImage: "play")
-                            .foregroundStyle(.green)
-                            .symbolVariant(.fill)
-                    }
-                }
-           }
+//                ToolbarItem(placement: .confirmationAction) {
+//                    Button(role: .none, action: {
+//                        DispatchQueue.main.async {
+//                            dismiss()
+//                            workoutManager.startCountdown()
+//                        }
+//                    }) {
+//                        Label("Start", systemImage: "play")
+//                            .foregroundStyle(.green)
+//                            .symbolVariant(.fill)
+//                    }
+//                }
+           //}
             
             .navigationTitle("Settings")
         //}
@@ -92,4 +88,5 @@ struct SimpleSinisterSettingsView: View {
 
 #Preview {
     SimpleSinisterSettingsView()
+        .environment(PracticeManager.shared)
 }

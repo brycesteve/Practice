@@ -193,7 +193,7 @@ extension Date {
     NavigationStack {
         List {
             CalendarView(selectedDate: $selectedDate)
-                .environment(HistoryManager())
+                .environment(HistoryManager.shared)
         }
     }
 }

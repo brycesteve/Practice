@@ -7,6 +7,7 @@ The start view.
 
 import SwiftUI
 import HealthKit
+import AppIntents
 
 struct StartView: View {
     @Environment(PracticeManager.self) var practiceManager
@@ -21,26 +22,11 @@ struct StartView: View {
         @Bindable var manager = practiceManager
         NavigationStack(path: $navigation) {
             List(practiceManager.availablePractices, id: \.name) { practice in
-                 
-                Button {
-                    practiceManager.selectedPractice = practice
-                     
-                }
-                label: {
-                    HStack {
-                        practice.image
-                            .padding(4)
-                            .background {
-                                Circle()
-                                    .fill(.green)
-                            }
-                            .foregroundStyle(.background)
-                        Spacer().frame(maxWidth: 8)
-                        Text(practice.name)
+                PracticeRowView(practice: practice) {
+                    Task {
+                        await startPractice(practice)
                     }
                 }
-                .padding(.vertical)
-                
                 
             }
             
@@ -48,22 +34,26 @@ struct StartView: View {
                 SessionPagingView()
             })
             
-            .listStyle(.carousel)
+            //.listStyle(.carousel)
             .navigationBarTitle("Practice")
-            .sheet(isPresented: $manager.showingSettingsForPractice, content: {
-                AnyView(practiceManager.settingsView!)
-            })
+//            .sheet(isPresented: $manager.showingSettingsForPractice, content: {
+//                AnyView(practiceManager.settingsView!)
+//            })
             
-        }
-        .onAppear {
-            practiceManager.requestAuthorization()
         }
         
         
     }
+    
+    func startPractice(_ practice: Practice) async {
+        let startIntent = StartPracticeIntent()
+        startIntent.practice = PracticeEntity(name: practice.rawValue)
+        _ = try? await startIntent.perform()
+        _ = try? await startIntent.donate()
+    }
 }
 
-#Preview {
+#Preview{
     StartView()
-        .environment(PracticeManager())
+        .environment(PracticeManager.shared)
 }

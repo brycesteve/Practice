@@ -47,8 +47,7 @@ enum Practice: String, Codable, CaseIterable {
                 SimpleSinisterSegment.warmUp,
                 SimpleSinisterSegment.swings,
                 SimpleSinisterSegment.getUps,
-                SimpleSinisterSegment.push,
-                SimpleSinisterSegment.pull
+                SimpleSinisterSegment.pushPull
             ]
         case .SimpleAndSinisterStretches:
             return [SimpleSinisterStretchesSegment.stretches]
@@ -71,6 +70,15 @@ enum Practice: String, Codable, CaseIterable {
             return SimpleSinisterSettingsView()
         default:
             return nil
+        }
+    }
+    
+    var watchMenuName: String {
+        switch self {
+        case .SimpleAndSinister:
+            return "S&S Practice"
+        case .SimpleAndSinisterStretches:
+            return "Stretches"
         }
     }
 #endif // os(watchOS)

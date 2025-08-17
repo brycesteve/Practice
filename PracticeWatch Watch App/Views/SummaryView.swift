@@ -1,9 +1,4 @@
-/*
-See the LICENSE.txt file for this sample’s licensing information.
 
-Abstract:
-The workout summary view.
-*/
 
 import Foundation
 import HealthKit
@@ -41,12 +36,23 @@ struct SummaryView: View {
                     SummaryMetricView(title: "Avg. Heart Rate",
                                       value: avgHeartRate().formatted(.number.precision(.fractionLength(0))) + " bpm")
                         .foregroundStyle(.red)
-                    Text("Activity").font(.headline.smallCaps())
-                    ActivityRingsView(healthStore: practiceManager.healthStore)
-                        .frame(width: 50, height: 50)
+                    if (totalWeightLifted().value > 0) {
+                        SummaryMetricView(title: "Total Weight", value: "\(totalWeightLifted().formatted(.practiceMass(width: .narrow)))")
+                            .foregroundStyle(.mint)
+
+                    }
+                    VStack {
+                        Text("Activity").font(.headline.smallCaps()).foregroundStyle(.secondary)
+                        ActivityRingsView(healthStore: practiceManager.healthStore)
+                            .frame(width: 50, height: 50)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
                     Button("Done") {
                         dismiss()
                     }
+                    .buttonStyle(.glass)
                 }
                 .scenePadding()
             }
@@ -69,11 +75,19 @@ struct SummaryView: View {
         let type = HKQuantityType.quantityType(forIdentifier: .heartRate)!
         return practiceManager.workout?.statistics(for: type)?.averageQuantity()?.doubleValue(for: HKUnit.count().unitDivided(by: .minute())) ?? 0
     }
+    
+    func totalWeightLifted() -> Measurement<UnitMass> {
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            return Measurement(value: 2600, unit: .kilograms)
+        }
+        let weight = practiceManager.workout?.simpleAndSinisterWeight ?? 0
+        return Measurement(value: Double(weight), unit: UnitMass.kilograms)
+    }
 }
 
 
 #Preview {
-    @Previewable @Bindable var practiceManager = PracticeManager()
+    @Previewable @Bindable var practiceManager = PracticeManager.shared
     ScrollView {
         SummaryView()
             .environment(practiceManager)
@@ -88,11 +102,17 @@ struct SummaryMetricView: View {
     var value: String
 
     var body: some View {
-        Text(title)
-            .font(.headline.smallCaps())
-            .foregroundStyle(.white)
-        Text(value)
-            .font(.system(.title2, design: .rounded).lowercaseSmallCaps())
-        Divider()
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.headline.smallCaps())
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.title2, design: .rounded).lowercaseSmallCaps())
+                .foregroundStyle(.primary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        
     }
 }

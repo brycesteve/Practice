@@ -9,6 +9,12 @@
 /* Begin PBXBuildFile section */
 		AA21ACF52DFF732C00574CCF /* Launch Screen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA21ACF42DFF732C00574CCF /* Launch Screen.storyboard */; };
 		AA5389CA2DE208B2008CA062 /* PracticeWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AA5389C02DE208B0008CA062 /* PracticeWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA5EAEE22E43F34F00A2743F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA5EAEE12E43F34F00A2743F /* WidgetKit.framework */; };
+		AA5EAEE42E43F34F00A2743F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA5EAEE32E43F34F00A2743F /* SwiftUI.framework */; };
+		AA5EAEEF2E43F35100A2743F /* PracticeWatchWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA5EAEDF2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA5EAEFF2E4919BF00A2743F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA5EAEE12E43F34F00A2743F /* WidgetKit.framework */; };
+		AA5EAF002E4919BF00A2743F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA5EAEE32E43F34F00A2743F /* SwiftUI.framework */; };
+		AA5EAF0B2E4919C100A2743F /* PracticeWidgetExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA5EAEFE2E4919BF00A2743F /* PracticeWidgetExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -18,6 +24,20 @@
 			proxyType = 1;
 			remoteGlobalIDString = AA5389BF2DE208B0008CA062;
 			remoteInfo = "PracticeWatch Watch App";
+		};
+		AA5EAEED2E43F35100A2743F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA5389A62DE2083D008CA062 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA5EAEDE2E43F34F00A2743F;
+			remoteInfo = PracticeWatchWidgetExtensionExtension;
+		};
+		AA5EAF092E4919C100A2743F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA5389A62DE2083D008CA062 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA5EAEFD2E4919BF00A2743F;
+			remoteInfo = PracticeWidgetExtensionExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -33,12 +53,50 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA5EAEF42E43F35100A2743F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA5EAEEF2E43F35100A2743F /* PracticeWatchWidgetExtensionExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA5EAF102E4919C100A2743F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA5EAF0B2E4919C100A2743F /* PracticeWidgetExtensionExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AAC3A8592E3557F8004C3A72 /* Embed ExtensionKit Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(EXTENSIONS_FOLDER_PATH)";
+			dstSubfolderSpec = 16;
+			files = (
+			);
+			name = "Embed ExtensionKit Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		AA21ACF42DFF732C00574CCF /* Launch Screen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Launch Screen.storyboard"; sourceTree = "<group>"; };
 		AA5389AE2DE2083D008CA062 /* Practice.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Practice.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA5389C02DE208B0008CA062 /* PracticeWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "PracticeWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA5EAEDF2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PracticeWatchWidgetExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA5EAEE12E43F34F00A2743F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		AA5EAEE32E43F34F00A2743F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		AA5EAEFE2E4919BF00A2743F /* PracticeWidgetExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PracticeWidgetExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA66813F2E50E0330046E95A /* PracticeWatchWidgetExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PracticeWatchWidgetExtensionExtension.entitlements; sourceTree = "<group>"; };
+		AA6681402E50E04C0046E95A /* PracticeWidgetExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PracticeWidgetExtensionExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,14 +104,27 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Models/CompletedPractice.swift,
+				Widgets/Readiness/ReadinessProvider.swift,
+				Widgets/Readiness/ReadinessWidget.swift,
 			);
 			target = AA5389AD2DE2083D008CA062 /* Practice */;
 		};
 		AA5389E62DE20B07008CA062 /* Exceptions for "Shared" folder in "PracticeWatch Watch App" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Controllers/ConnectivityBridge.swift,
+				Controllers/Readiness/ReadinessManager.swift,
+				Controllers/Readiness/ReadinessMetric.swift,
+				Controllers/Readiness/ReadinessMetrics.swift,
+				Controllers/Readiness/SleepConsistency.swift,
+				Controllers/SharedIDs.swift,
+				"Extensions/Date+Extensions.swift",
 				"Extensions/HealthKit+Extensions.swift",
+				"Extensions/Measurement+Extension.swift",
 				"Extensions/UserDefaults+extension.swift",
+				FormatStyles/PracticeMassFormatStyle.swift,
+				Intents/PracticeEntity.swift,
+				Intents/PracticeQuery.swift,
 				Logger.swift,
 				Models/Exercise.swift,
 				Models/Practice.swift,
@@ -63,11 +134,57 @@
 			);
 			target = AA5389BF2DE208B0008CA062 /* PracticeWatch Watch App */;
 		};
+		AA5EAEDA2E43EE0100A2743F /* Exceptions for "Practice" folder in "Practice" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA5389AD2DE2083D008CA062 /* Practice */;
+		};
+		AA5EAEF32E43F35100A2743F /* Exceptions for "PracticeWatchWidgetExtension" folder in "PracticeWatchWidgetExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA5EAEDE2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension */;
+		};
+		AA5EAEF62E43F3DD00A2743F /* Exceptions for "Shared" folder in "PracticeWatchWidgetExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Controllers/SharedIDs.swift,
+				Logger.swift,
+				SharedAssets.xcassets,
+				Widgets/Readiness/ReadinessProvider.swift,
+				Widgets/Readiness/ReadinessWidget.swift,
+			);
+			target = AA5EAEDE2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension */;
+		};
+		AA5EAF0F2E4919C100A2743F /* Exceptions for "PracticeWidgetExtension" folder in "PracticeWidgetExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA5EAEFD2E4919BF00A2743F /* PracticeWidgetExtensionExtension */;
+		};
+		AA5EAF122E4919E500A2743F /* Exceptions for "Shared" folder in "PracticeWidgetExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Controllers/SharedIDs.swift,
+				Logger.swift,
+				SharedAssets.xcassets,
+				Widgets/Readiness/ReadinessProvider.swift,
+				Widgets/Readiness/ReadinessWidget.swift,
+			);
+			target = AA5EAEFD2E4919BF00A2743F /* PracticeWidgetExtensionExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA5389B02DE2083D008CA062 /* Practice */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA5EAEDA2E43EE0100A2743F /* Exceptions for "Practice" folder in "Practice" target */,
+			);
 			path = Practice;
 			sourceTree = "<group>";
 		};
@@ -81,8 +198,26 @@
 			exceptions = (
 				AA47CD982E22A69E008AE45B /* Exceptions for "Shared" folder in "Practice" target */,
 				AA5389E62DE20B07008CA062 /* Exceptions for "Shared" folder in "PracticeWatch Watch App" target */,
+				AA5EAEF62E43F3DD00A2743F /* Exceptions for "Shared" folder in "PracticeWatchWidgetExtensionExtension" target */,
+				AA5EAF122E4919E500A2743F /* Exceptions for "Shared" folder in "PracticeWidgetExtensionExtension" target */,
 			);
 			path = Shared;
+			sourceTree = "<group>";
+		};
+		AA5EAEE52E43F34F00A2743F /* PracticeWatchWidgetExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA5EAEF32E43F35100A2743F /* Exceptions for "PracticeWatchWidgetExtension" folder in "PracticeWatchWidgetExtensionExtension" target */,
+			);
+			path = PracticeWatchWidgetExtension;
+			sourceTree = "<group>";
+		};
+		AA5EAF012E4919BF00A2743F /* PracticeWidgetExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA5EAF0F2E4919C100A2743F /* Exceptions for "PracticeWidgetExtension" folder in "PracticeWidgetExtensionExtension" target */,
+			);
+			path = PracticeWidgetExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -102,15 +237,38 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA5EAEDC2E43F34F00A2743F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA5EAEE42E43F34F00A2743F /* SwiftUI.framework in Frameworks */,
+				AA5EAEE22E43F34F00A2743F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA5EAEFB2E4919BF00A2743F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA5EAF002E4919BF00A2743F /* SwiftUI.framework in Frameworks */,
+				AA5EAEFF2E4919BF00A2743F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		AA5389A52DE2083D008CA062 = {
 			isa = PBXGroup;
 			children = (
+				AA6681402E50E04C0046E95A /* PracticeWidgetExtensionExtension.entitlements */,
+				AA66813F2E50E0330046E95A /* PracticeWatchWidgetExtensionExtension.entitlements */,
 				AA21ACF42DFF732C00574CCF /* Launch Screen.storyboard */,
 				AA5389E12DE20AF1008CA062 /* Shared */,
 				AA5389B02DE2083D008CA062 /* Practice */,
+				AA5EAEE52E43F34F00A2743F /* PracticeWatchWidgetExtension */,
+				AA5EAF012E4919BF00A2743F /* PracticeWidgetExtension */,
+				AA5EAEE02E43F34F00A2743F /* Frameworks */,
 				AA5389AF2DE2083D008CA062 /* Products */,
 				AA5389C12DE208B0008CA062 /* PracticeWatch Watch App */,
 			);
@@ -121,8 +279,19 @@
 			children = (
 				AA5389AE2DE2083D008CA062 /* Practice.app */,
 				AA5389C02DE208B0008CA062 /* PracticeWatch Watch App.app */,
+				AA5EAEDF2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension.appex */,
+				AA5EAEFE2E4919BF00A2743F /* PracticeWidgetExtensionExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA5EAEE02E43F34F00A2743F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				AA5EAEE12E43F34F00A2743F /* WidgetKit.framework */,
+				AA5EAEE32E43F34F00A2743F /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -136,11 +305,13 @@
 				AA5389AB2DE2083D008CA062 /* Frameworks */,
 				AA5389AC2DE2083D008CA062 /* Resources */,
 				AA5389CE2DE208B2008CA062 /* Embed Watch Content */,
+				AA5EAF102E4919C100A2743F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				AA5389C92DE208B2008CA062 /* PBXTargetDependency */,
+				AA5EAF0A2E4919C100A2743F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA5389B02DE2083D008CA062 /* Practice */,
@@ -160,10 +331,13 @@
 				AA5389BC2DE208B0008CA062 /* Sources */,
 				AA5389BD2DE208B0008CA062 /* Frameworks */,
 				AA5389BE2DE208B0008CA062 /* Resources */,
+				AAC3A8592E3557F8004C3A72 /* Embed ExtensionKit Extensions */,
+				AA5EAEF42E43F35100A2743F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA5EAEEE2E43F35100A2743F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA5389C12DE208B0008CA062 /* PracticeWatch Watch App */,
@@ -175,6 +349,50 @@
 			productReference = AA5389C02DE208B0008CA062 /* PracticeWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		AA5EAEDE2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA5EAEF02E43F35100A2743F /* Build configuration list for PBXNativeTarget "PracticeWatchWidgetExtensionExtension" */;
+			buildPhases = (
+				AA5EAEDB2E43F34F00A2743F /* Sources */,
+				AA5EAEDC2E43F34F00A2743F /* Frameworks */,
+				AA5EAEDD2E43F34F00A2743F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA5EAEE52E43F34F00A2743F /* PracticeWatchWidgetExtension */,
+			);
+			name = PracticeWatchWidgetExtensionExtension;
+			packageProductDependencies = (
+			);
+			productName = PracticeWatchWidgetExtensionExtension;
+			productReference = AA5EAEDF2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		AA5EAEFD2E4919BF00A2743F /* PracticeWidgetExtensionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA5EAF0C2E4919C100A2743F /* Build configuration list for PBXNativeTarget "PracticeWidgetExtensionExtension" */;
+			buildPhases = (
+				AA5EAEFA2E4919BF00A2743F /* Sources */,
+				AA5EAEFB2E4919BF00A2743F /* Frameworks */,
+				AA5EAEFC2E4919BF00A2743F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA5EAF012E4919BF00A2743F /* PracticeWidgetExtension */,
+			);
+			name = PracticeWidgetExtensionExtension;
+			packageProductDependencies = (
+			);
+			productName = PracticeWidgetExtensionExtension;
+			productReference = AA5EAEFE2E4919BF00A2743F /* PracticeWidgetExtensionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -182,7 +400,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1630;
+				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					AA5389AD2DE2083D008CA062 = {
@@ -190,6 +408,12 @@
 					};
 					AA5389BF2DE208B0008CA062 = {
 						CreatedOnToolsVersion = 16.3;
+					};
+					AA5EAEDE2E43F34F00A2743F = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					AA5EAEFD2E4919BF00A2743F = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -209,6 +433,8 @@
 			targets = (
 				AA5389AD2DE2083D008CA062 /* Practice */,
 				AA5389BF2DE208B0008CA062 /* PracticeWatch Watch App */,
+				AA5EAEDE2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension */,
+				AA5EAEFD2E4919BF00A2743F /* PracticeWidgetExtensionExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +449,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		AA5389BE2DE208B0008CA062 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA5EAEDD2E43F34F00A2743F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA5EAEFC2E4919BF00A2743F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -246,6 +486,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA5EAEDB2E43F34F00A2743F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA5EAEFA2E4919BF00A2743F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -253,6 +507,16 @@
 			isa = PBXTargetDependency;
 			target = AA5389BF2DE208B0008CA062 /* PracticeWatch Watch App */;
 			targetProxy = AA5389C82DE208B2008CA062 /* PBXContainerItemProxy */;
+		};
+		AA5EAEEE2E43F35100A2743F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA5EAEDE2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension */;
+			targetProxy = AA5EAEED2E43F35100A2743F /* PBXContainerItemProxy */;
+		};
+		AA5EAF0A2E4919C100A2743F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA5EAEFD2E4919BF00A2743F /* PracticeWidgetExtensionExtension */;
+			targetProxy = AA5EAF092E4919C100A2743F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -392,8 +656,11 @@
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Practice/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start workouts";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -424,8 +691,11 @@
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Practice/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start workouts";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -460,6 +730,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Practice;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start Workouts";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = net.stevebryce.Practice;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -494,6 +765,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Practice;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start Workouts";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = net.stevebryce.Practice;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -509,6 +781,144 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		AA5EAEF12E43F35100A2743F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PracticeWatchWidgetExtensionExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XHMLRUNE5V;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PracticeWatchWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.stevebryce.Practice.watchkitapp.PracticeWatchWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		AA5EAEF22E43F35100A2743F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PracticeWatchWidgetExtensionExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XHMLRUNE5V;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PracticeWatchWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.stevebryce.Practice.watchkitapp.PracticeWatchWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		AA5EAF0D2E4919C100A2743F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PracticeWidgetExtensionExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XHMLRUNE5V;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PracticeWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.stevebryce.Practice.PracticeWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AA5EAF0E2E4919C100A2743F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = PracticeWidgetExtensionExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = XHMLRUNE5V;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PracticeWidgetExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.stevebryce.Practice.PracticeWidgetExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -538,6 +948,24 @@
 			buildConfigurations = (
 				AA5389CC2DE208B2008CA062 /* Debug */,
 				AA5389CD2DE208B2008CA062 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA5EAEF02E43F35100A2743F /* Build configuration list for PBXNativeTarget "PracticeWatchWidgetExtensionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA5EAEF12E43F35100A2743F /* Debug */,
+				AA5EAEF22E43F35100A2743F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA5EAF0C2E4919C100A2743F /* Build configuration list for PBXNativeTarget "PracticeWidgetExtensionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA5EAF0D2E4919C100A2743F /* Debug */,
+				AA5EAF0E2E4919C100A2743F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

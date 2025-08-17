@@ -86,7 +86,7 @@ struct StartTimerView: View {
 }
 
 #Preview {
-    @Previewable @State var practiceManager = PracticeManager()
+    @Previewable @State var practiceManager = PracticeManager.shared
     StartTimerView()
         .environment(practiceManager)
 }

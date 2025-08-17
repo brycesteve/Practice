@@ -7,16 +7,21 @@ The workout metrics view.
 
 import SwiftUI
 import HealthKit
+import Combine
 
 struct MetricsView: View {
     @Environment(PracticeManager.self) var practiceManager
     
+    @State var crownManager = CrownRotationManager()
+    
+    @State var exerciseTimeRemaining: TimeInterval = 0
+    @State var exerciseTimer: Cancellable?
+    
     var body: some View {
         @Bindable var practiceManager = practiceManager
         NavigationStack {
-            ScrollView {
-                
-                    TimelineView(MetricsTimelineSchedule(from: practiceManager.builder?.startDate ?? Date(),
+            VStack {
+                TimelineView(MetricsTimelineSchedule(from: practiceManager.builder?.startDate ?? Date(),
                                                          isPaused: practiceManager.session?.state == .paused)) { context in
                         VStack(alignment: .leading) {
                             ElapsedTimeView(elapsedTime: practiceManager.builder?.elapsedTime(at: context.date) ?? 0, showSubseconds: context.cadence == .live)
@@ -33,19 +38,27 @@ struct MetricsView: View {
                                 Text(practiceManager.segmentSetCount)
                             }
                             .font(.headline.lowercaseSmallCaps())
-                            .foregroundStyle(.mint)
+                            .foregroundStyle(.blue)
                             
                             HStack(alignment: .top) {
                                 Text(practiceManager.setDescription)
                                     .multilineTextAlignment(.leading)
                                 
                                 Spacer()
-                                Text(practiceManager.setWeight)
+                                Text(practiceManager.setRepsOrDuration)
                             }
                             .font(.caption.smallCaps())
+                            .foregroundStyle(.mint)
+                            if (practiceManager.showExerciseTimer) {
+                                HStack(alignment: .center) {
+                                    Label(formattedTimeRemaining, systemImage: "timer")
+                                        .symbolRenderingMode(.multicolor)
+                                        .padding(.top, 4)
+                                }
+                            }
                             
                         }
-                        .padding(.top)
+                        //.padding(.top)
                         .font(.system(.title2, design: .rounded).monospacedDigit().lowercaseSmallCaps())
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .ignoresSafeArea(edges: .bottom)
@@ -54,7 +67,7 @@ struct MetricsView: View {
                             ToolbarItemGroup(placement: .bottomBar) {
                                 Spacer()
                                 Button {
-                                    practiceManager.startNextActivity()
+                                    manualAdvance()
                                 }
                                 label: {
                                     Image(systemName: "arrow.right")
@@ -63,23 +76,74 @@ struct MetricsView: View {
                             }
                         }
                         .scenePadding()
-                        
-                    }
-                
+                }
+            }
+            .withDigitalCrown(manager: crownManager)
+            .onChange(of: showTimerHash, initial: true) {
+                _,_ in
+                if practiceManager.showExerciseTimer {
+                    setupTimer()
+                }
+            }
+           .onAppear {
+                crownManager.onTrigger = {
+                    manualAdvance()
+                }
             }
         }
         
         
+        
+    }
+    
+    var showTimerHash: Int {
+        var hasher = Hasher()
+        hasher.combine(practiceManager.currentSegmentIndex)
+        hasher.combine(practiceManager.currentExerciseIndex)
+        hasher.combine(practiceManager.showExerciseTimer)
+        
+        return hasher.finalize()
+    }
+    
+    func setupTimer() {
+        exerciseTimeRemaining = TimeInterval(practiceManager.exerciseTimerDuration?.components.seconds ?? 0)
+        exerciseTimeRemaining -= 1
+        stopExerciseTimer()
+        exerciseTimer = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in
+                exerciseTimeRemaining -= 1
+                if exerciseTimeRemaining <= 0 {
+                    WKInterfaceDevice.current().play(.notification)
+                    stopExerciseTimer()
+                    practiceManager.startNextActivity()
+                }
+            }
+    }
+    
+    var formattedTimeRemaining: String {
+        return Duration.seconds(exerciseTimeRemaining).formatted(.units(width: .narrow))
+    }
+    
+    func stopExerciseTimer() {
+        exerciseTimer?.cancel()
+        exerciseTimer = nil
+    }
+    
+    func manualAdvance() {
+        WKInterfaceDevice.current().play(.click)
+        stopExerciseTimer()
+        practiceManager.startNextActivity()
     }
 }
 
 #Preview {
-    @Previewable @State var practiceManager = PracticeManager()
+    @Previewable @State var practiceManager = PracticeManager.shared
     MetricsView()
         .environment(practiceManager)
         .onAppear {
-            practiceManager.selectedPractice = .SimpleAndSinister
-            practiceManager.currentSegmentIndex = 1
+            practiceManager.selectedPractice = .SimpleAndSinisterStretches
+            practiceManager.currentSegmentIndex = 0
             practiceManager.currentExerciseIndex = 2
         }
 }

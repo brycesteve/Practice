@@ -40,6 +40,6 @@ struct ControlsView: View {
 
 struct ControlsView_Previews: PreviewProvider {
     static var previews: some View {
-        ControlsView().environment(PracticeManager())
+        ControlsView().environment(PracticeManager.shared)
     }
 }

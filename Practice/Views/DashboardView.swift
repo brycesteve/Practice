@@ -7,6 +7,7 @@
 import SwiftUI
 import HealthKit
 import OSLog
+import Charts
 
 struct DashboardView: View {
     @State var practices: [HKWorkout] = []
@@ -17,54 +18,74 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
            List {
-                
-                let current = currentStreak()
-                let longest = longestStreak()
-                SummaryCardView(
-                    title: "Current Streak",
-                    icon: "flame.fill",
-                    value: "\(current.length) days",
-                    dateRange: current.dateRange,
-                    color: current.length > 0 ? .orange : .gray
-                )
-                .listRowSeparator(.hidden)
-                .listSectionSeparator(.hidden)
-                .listRowInsets(.vertical, 8)
-                
-                SummaryCardView(
-                    title: "Longest Streak",
-                    icon: "trophy.fill",
-                    value: "\(longest.length) days",
-                    dateRange: longest.dateRange,
-                    color: longest.length > 0 ? .yellow : .gray
-                )
-                .listRowSeparator(.hidden)
-                .listSectionSeparator(.hidden)
-                .listRowInsets(.vertical, 8)
-                
-                
-                DashboardCard(title: "Last Practice", value: relativeDate(of: practices.last?.endDate), icon: "calendar", color: .red)
+              ReadinessCard()
+                   .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                   .listRowSeparator(.hidden)
+                   .listSectionSeparator(.hidden)
+                   .listRowInsets(.vertical, 8)
             
-                .listRowSeparator(.hidden)
-                .listSectionSeparator(.hidden)
-                .listRowInsets(.vertical, 8)
+               let current = currentStreak()
+            let longest = longestStreak()
                
-               DashboardCard(
-                title: "Simple and Sinister Total",
-                value: totalMass().formatted(.practiceMass(width: .wide)), icon: "scalemass.fill",
-                color: Color.purple
-               )
+               HStack {
+                   VStack(alignment: .leading) {
+                       Text("Current Streak")
+                           .font(.caption)
+                           .foregroundStyle(.secondary)
+                       Text("\(current.length) days")
+                           .font(.title3.bold())
+                   }
+                   Spacer()
+                   VStack(alignment: .leading) {
+                       Text("Longest Streak")
+                           .font(.caption)
+                           .foregroundStyle(.secondary)
+                       Text("\(longest.length) days")
+                           .font(.title3.bold())
+                   }
+                   Spacer()
+                   VStack(alignment: .leading) {
+                       Text("Last Workout")
+                           .font(.caption)
+                           .foregroundStyle(.secondary)
+                       Text(relativeDate(of: practices.last?.endDate))
+                           .font(.title3.bold())
+                   }
+               }
+               .padding()
+               .glassEffect(.regular, in: .rect(cornerRadius: 12))
+               .listRowSeparator(.hidden)
+               .listSectionSeparator(.hidden)
+               .listRowInsets(.vertical, 8)
+            
+               
+               //Work/Rest
+               WeeklyMetricsView(practices: practices)
+               .padding()
+               .glassEffect(.regular, in: .rect(cornerRadius: 12))
                .listRowSeparator(.hidden)
                .listSectionSeparator(.hidden)
                .listRowInsets(.vertical, 8)
                
-               ProgressGraphView(data: practiceData())
+               ProgressCard(currentTonnage: rollingAverageWorkoutMass())
+                   .padding()
+                   .glassEffect(.regular, in: .rect(cornerRadius: 12))
                    .listRowSeparator(.hidden)
                    .listSectionSeparator(.hidden)
                    .listRowInsets(.vertical, 8)
+               VO2MaxTrendCard()
+                   .padding()
+                   .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                   .listRowSeparator(.hidden)
+                   .listSectionSeparator(.hidden)
+                   .listRowInsets(.vertical, 8)
+                
             }
            .scrollContentBackground(.hidden)
            .listStyle(.plain)
+           .refreshable {
+               await ReadinessManager.shared.refresh()
+           }
             .navigationTitle("Dashboard")
             .task {
                 await updatePractices()
@@ -97,14 +118,16 @@ struct DashboardView: View {
         return Measurement(value: Double(mass), unit: UnitMass.kilograms)
     }
     
-    func practiceData() -> [PracticeVolume] {
-        let data = practices.filter{
-            $0.simpleAndSinisterWeight > 0
-        }.map {
-            PracticeVolume(weight: $0.simpleAndSinisterWeight, date: $0.startDate)
+    func rollingAverageWorkoutMass() -> Double {
+        let relevantPractices = practices.suffix(5)
+        guard !relevantPractices.isEmpty else {
+            return 0
         }
-        Logger.default.debug("Practice Data: \(data)")
-        return data
+        
+        let mass = relevantPractices.reduce(into: 0) { accum, next in
+            accum += next.simpleAndSinisterWeight
+        }
+        return Double(mass / relevantPractices.count)
     }
     
     func currentStreak() -> Streak {
@@ -117,15 +140,20 @@ struct DashboardView: View {
 
     func relativeDate(of date: Date?) -> String {
         guard let date = date else { return "Never" }
-        return RelativeDateTimeFormatter().string(for: date) ?? ""
+        let formatter = RelativeDateTimeFormatter()
+        formatter.formattingContext = .standalone
+        formatter.dateTimeStyle = .named
+        return formatter.string(for: date) ?? ""
     }
 }
 
 #Preview {
-    @Previewable @State var historyManager: HistoryManager = .init()
+    @Previewable @State var historyManager: HistoryManager = HistoryManager.shared
     NavigationStack {
         DashboardView()
             .environment(historyManager)
+            .environment(GlobalLoadingState())
+            .environment(ReadinessManager.shared)
     }
 }
 

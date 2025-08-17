@@ -22,6 +22,10 @@ import OSLog
 @Observable
 class PracticeManager: NSObject {
     
+    static let shared = PracticeManager()
+    
+    private override init() {}
+    
     /**
      Practices to show on menu
      */
@@ -35,20 +39,20 @@ class PracticeManager: NSObject {
     
     // MARK: - Modal Views Page
     
-    var settingsView: (any View)?
+    //var settingsView: (any View)?
     
     /**
      Show Settings page for the current practice
      */
-    var showingSettingsForPractice: Bool = false {
-        didSet {
-            if !showingSettingsForPractice {
-                //DispatchQueue.main.async {
-                    self.settingsView = nil
-                //}
-            }
-        }
-    }
+//    var showingSettingsForPractice: Bool = false {
+//        didSet {
+//            if !showingSettingsForPractice {
+//                //DispatchQueue.main.async {
+//                    self.settingsView = nil
+//                //}
+//            }
+//        }
+//    }
     
     var showingCountdownTimer: Bool = false
     {
@@ -61,9 +65,9 @@ class PracticeManager: NSObject {
     
     func startCountdown() {
         //DispatchQueue.main.async {
-            if self.showingSettingsForPractice {
-                self.showingSettingsForPractice = false
-            }
+//            if self.showingSettingsForPractice {
+//                self.showingSettingsForPractice = false
+//            }
             self.showingCountdownTimer = true
             
             self.running = true
@@ -127,12 +131,31 @@ class PracticeManager: NSObject {
     
     
     // MARK: - Set Handling
-    private func addActivity() {
-        guard let session = session, let currentSegment = currentSegment, let currentExerciseIndex = currentExerciseIndex else { return }
+    
+    var currentSetStart: Date?
+    
+    // Add new Segment
+    private func startSegment() {
+        guard let session = session, let currentSegment = currentSegment else { return }
+        let sessionConfig = session.currentActivity.workoutConfiguration
+        sessionConfig.activityType = currentSegment.segmentExerciseType
+        
+        //FIXME: IS THIS GOING TO ERROR? Different Activity Types?
+        session.beginNewActivity(configuration: sessionConfig, date: Date(), metadata: [PracticeSegmentNameMetaDataKey: currentSegment.name] as [String: Any])
+    }
+    
+    // Add new Set
+    private func endSet() {
+        guard session != nil, let currentSegment = currentSegment, let currentExerciseIndex = currentExerciseIndex, let setStart = currentSetStart else { return }
+        currentSetStart = nil
         let currentExercise = currentSegment.sets[currentExerciseIndex]
         if let metadata = try? JSONEncoder().encode(currentExercise).base64EncodedString() {
-            Logger.default.debug("\(metadata.description)")
-            session.beginNewActivity(configuration: session.workoutConfiguration, date: Date(), metadata: [Exercise.metadataKey: metadata, PracticeSegmentNameMetaDataKey: currentSegment.name] as [String: Any])
+            let dateInterval = DateInterval(start: setStart, end: Date())
+            
+            let event = HKWorkoutEvent(type: .segment, dateInterval: dateInterval, metadata: [Exercise.metadataKey: metadata] as [String: Any])
+            builder?.addWorkoutEvents([event]) { success, error in
+                //
+            }
         }
     }
     
@@ -144,18 +167,27 @@ class PracticeManager: NSObject {
         if currentExerciseIndex == nil, currentSegmentIndex == nil {
             currentExerciseIndex = 0
             currentSegmentIndex = 0
-            addActivity()
+            WKInterfaceDevice.current().play(.start)
+            startSegment()
+            currentSetStart = Date()
         }
         else if currentExerciseIndex! + 1 < currentSegment!.sets.count {
+            endSet()
             currentExerciseIndex! += 1
-            addActivity()
+            let exercise = currentSegment!.sets[currentExerciseIndex!]
+            WKInterfaceDevice.current().play(exercise.hapticType)
+            currentSetStart = Date()
         }
         else if currentSegmentIndex! + 1 < selectedPractice.segments.count {
+            endSet()
             currentSegmentIndex! += 1
             currentExerciseIndex = 0
-            addActivity()
+            WKInterfaceDevice.current().play(.start)
+            startSegment()
+            currentSetStart = Date()
         }
         else {
+            endSet()
             endWorkout()
         }
     }
@@ -169,7 +201,31 @@ class PracticeManager: NSObject {
     }
     
     var currentExerciseIndex: Int? //{
+    
+    var showExerciseTimer: Bool {
+        guard let currentSegment = currentSegment, let currentExerciseIndex = currentExerciseIndex else {
+            return false
+        }
+        if let modality = currentSegment.sets[currentExerciseIndex].modality {
+            if case .timed = modality { return true }
+        }
+        return false
+    }
 
+    var exerciseTimerDuration: Duration? {
+        guard let currentSegment = currentSegment, let currentExerciseIndex = currentExerciseIndex else {
+            return nil
+        }
+        if let modality = currentSegment.sets[currentExerciseIndex].modality {
+            switch modality {
+            case .timed(let duration):
+                return duration
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
     
     var segmentDescription: String {
         currentSegment?.name ?? ""
@@ -193,14 +249,11 @@ class PracticeManager: NSObject {
         return currentSegment.sets[currentExerciseIndex].description
     }
     
-    var setWeight: String {
+    var setRepsOrDuration: String {
         guard let currentSegment = currentSegment, let currentExerciseIndex = currentExerciseIndex else {
             return ""
         }
-        if let weight = currentSegment.sets[currentExerciseIndex].weight {
-            return "\(weight)Kg"
-        }
-        else { return "" }
+        return currentSegment.sets[currentExerciseIndex].repsOrDuration
     }
     
     
@@ -209,16 +262,16 @@ class PracticeManager: NSObject {
     var selectedPractice: Practice? {
         didSet {
             guard selectedPractice != nil else { return }
-            if let settings = selectedPractice?.settingsView {
-                //DispatchQueue.main.async {
-                    self.settingsView = settings
-                    self.showingSettingsForPractice = true
-                //}
-                   
-            }
-            else {
+//            if let settings = selectedPractice?.settingsView {
+//                //DispatchQueue.main.async {
+//                    self.settingsView = settings
+//                    self.showingSettingsForPractice = true
+//                //}
+//                   
+//            }
+//            else {
                 startCountdown()
-            }
+//            }
         }
     }
     
@@ -250,7 +303,6 @@ class PracticeManager: NSObject {
         // Start the workout session and begin data collection.
         let startDate = Date()
         session?.startActivity(with: startDate)
-        
         startNextActivity()
         builder?.beginCollection(withStart: startDate) { (success, error) in
             if (error != nil) {
@@ -266,10 +318,9 @@ class PracticeManager: NSObject {
     
     
     // Request authorization to access HealthKit.
-    func requestAuthorization() {
-        healthStore.requestAuthorization(toShare: HKObjectType.typesToShare, read: HKObjectType.typesToRead) { (success, error) in
-            // Handle error.
-        }
+    func requestAuthorization() async throws {
+        try await healthStore.requestAuthorization(toShare: HKObjectType.typesToShare, read: HKObjectType.typesToRead)
+        ReadinessManager.shared.setupObserversIfNeeded()
     }
 
     // MARK: - Session State Control

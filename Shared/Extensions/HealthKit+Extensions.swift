@@ -22,38 +22,60 @@ extension HKObjectType {
             .quantityType(forIdentifier: .heartRate)!,
             .quantityType(forIdentifier: .activeEnergyBurned)!,
             .activitySummaryType(),
-            .characteristicType(forIdentifier: .dateOfBirth)!
+            .characteristicType(forIdentifier: .dateOfBirth)!,
+            .quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
+            .quantityType(forIdentifier: .restingHeartRate)!,
+            .categoryType(forIdentifier: .sleepAnalysis)!,
+            .quantityType(forIdentifier: .vo2Max)!
         ]
     }
 }
 
-//extension HKWorkout {
-//    var completedPracticeMetadata: CompletedPractice? {
-//        guard metadata?.keys.contains(where: {$0 == "PracticeMeta"}) ?? false else {
-//            return nil
-//        }
-//        return CompletedPractice(from: metadata!["PracticeMeta"] as! String)
-//    }
-//}
+struct WorkRestRatio {
+    let workTime: TimeInterval
+    let restTime: TimeInterval
+    var ratio: Double {
+        workTime / (workTime + restTime)
+    }
+}
+
+struct WeeklyMetrics: Identifiable {
+    var id: Date { weekStart }
+    let weekStart: Date
+    let work: TimeInterval
+    let rest: TimeInterval
+    let tonnage: Int
+    
+    var ratio: Double {
+        let total = work + rest
+        return total > 0 ? work / total : 0
+    }
+    
+    var changeFromLast: Double? = nil
+}
+
+
 
 extension HKWorkout {
     var brandName: String? {
         return metadata?[HKMetadataKeyWorkoutBrandName] as? String
     }
     
-    var segments: Dictionary<String, [HKWorkoutActivity]> {
-        guard !workoutActivities.isEmpty else { return [:] }
-        return Dictionary(grouping: workoutActivities, by: { $0.segemntName ?? "Segment" })
+    var segments: [HKWorkoutActivity] {
+        guard !workoutActivities.isEmpty else { return [] }
+        return workoutActivities
     }
     
     var simpleAndSinisterWeight: Int {
         guard metadata?[HKMetadataKeyWorkoutBrandName] as? String == Practice.SimpleAndSinister.rawValue,
-              workoutActivities.count > 0
+              let workoutEvents = workoutEvents, workoutEvents.count > 0
         else {
             return 0
         }
-        let exercises = workoutActivities.compactMap { activity in
-            return Exercise.from(activity)
+        let exercises = workoutEvents.filter { event in
+                event.type == .segment
+        }.compactMap { event in
+            return Exercise.from(event)
         }.filter {
             if case .swing = $0 { return true }
             if case .getUp = $0 { return true }
@@ -62,8 +84,8 @@ extension HKWorkout {
         
         let weight = exercises.reduce(into: 0) {
             switch $1 {
-            case let .swing(reps, weight, _),
-                let .getUp(reps, weight, _):
+            case let .swing(.count(reps), weight, _),
+                let .getUp(.count(reps), weight, _):
                 $0 += (weight * reps)
             default:
                 return
@@ -71,13 +93,60 @@ extension HKWorkout {
         }
         return weight
     }
+    
+    var workToRestRatio: WorkRestRatio {
+        guard let events = workoutEvents else {
+            return WorkRestRatio(workTime: 0, restTime: 0)
+        }
+
+        var work: TimeInterval = 0
+        var rest: TimeInterval = 0
+        
+        for event in events where event.type == .segment {
+            let duration = event.dateInterval.duration
+            let exercise = Exercise.from(event)
+            let isRest = exercise == .rest
+            
+            if isRest {
+                rest += duration
+            } else {
+                work += duration
+            }
+        }
+        
+        return WorkRestRatio(workTime: work, restTime: rest)
+    }
 }
 
 extension HKWorkoutActivity {
-    var segemntName: String? {
-        return metadata?[PracticeSegmentNameMetaDataKey] as? String
+    var segmentName: String {
+        return metadata?[PracticeSegmentNameMetaDataKey] as? String ?? "Segment"
     }
     
+    var exerciseEvents: [HKWorkoutEvent] {
+        return workoutEvents.filter { event in
+            event.type == .segment
+        }
+    }
+    
+    var workToRestRatio: WorkRestRatio {
+        var work: TimeInterval = 0
+        var rest: TimeInterval = 0
+        
+        for event in workoutEvents where event.type == .segment {
+            let duration = event.dateInterval.duration
+            let exercise = Exercise.from(event)
+            let isRest = exercise == .rest
+            
+            if isRest {
+                rest += duration
+            } else {
+                work += duration
+            }
+        }
+        
+        return WorkRestRatio(workTime: work, restTime: rest)
+    }
 }
 
 
@@ -206,5 +275,39 @@ extension Collection where Element == HKWorkout {
         return Streak(length: streak.count, start: streak.first, end: streak.last)
     }
 
+    func calculateWeeklyMetrics() -> [WeeklyMetrics] {
+        // Step 1: Map each segment to its week + type
+        var weeklyData: [Date: (work: TimeInterval, rest: TimeInterval, tonnage: Int, count: Int)] = [:]
+        
+        for workout in self {
+            let workRest = workout.workToRestRatio
+            let date = workout.startDate.startOfWeek()
+            if weeklyData[date] == nil { weeklyData[date] = (0,0, 0, 0) }
+            weeklyData[date]!.rest += workRest.restTime
+            weeklyData[date]!.work += workRest.workTime
+            
+            let tonnage = workout.simpleAndSinisterWeight
+            weeklyData[date]!.tonnage += tonnage
+            if tonnage > 0 { weeklyData[date]!.count += 1 }
+        }
+        
+        // Step 2: Convert to array of WeeklyWorkRest
+        var weeklyArray = weeklyData.map { (week, values) in
+            WeeklyMetrics(weekStart: week, work: values.work, rest: values.rest, tonnage: values.count > 0 ? Int(values.tonnage / values.count) : 0)
+        }
+        .sorted { $0.weekStart < $1.weekStart }
+        
+        if (weeklyArray.count > 1) {
+            for i in 1..<weeklyArray.count {
+                let change = weeklyArray[i].ratio - weeklyArray[i-1].ratio
+                weeklyArray[i].changeFromLast = change
+            }
+        }
+        return weeklyArray
+    }
+    
+    
 
 }
+
+

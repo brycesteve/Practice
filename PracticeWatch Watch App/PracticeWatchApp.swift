@@ -6,10 +6,25 @@
 //
 
 import SwiftUI
+import Foundation
+import AppIntents
+import OSLog
 
 @main
 struct PracticeWatch_Watch_AppApp: App {
-    @Bindable private var practiceManager = PracticeManager()
+    @Bindable private var practiceManager = PracticeManager.shared
+    
+    init(){
+        _ = ConnectivityBridge.shared
+        Task {
+            do {
+                try await PracticeManager.shared.requestAuthorization()
+            }
+            catch (let error) {
+                Logger.default.error("\(error.localizedDescription)")
+            }
+        }
+    }
 
     @SceneBuilder var body: some Scene {
         WindowGroup {
@@ -29,6 +44,11 @@ struct PracticeWatch_Watch_AppApp: App {
             }
             
             .environment(practiceManager)
+            .onReceive(NotificationCenter.default.publisher(for: .startPractice)) { notification in
+                if let practiceName = notification.object as? String, let practice = Practice(rawValue: practiceName) {
+                    practiceManager.selectedPractice = practice
+                }
+            }
         }
     }
     
@@ -44,5 +64,6 @@ class AppDelegate: NSObject, WKApplicationDelegate {
             Exercise.CodingKeys.swing.rawValue: 24,
             Exercise.CodingKeys.getUp.rawValue: 24
         ])
+        PracticeAppShortcuts.updateAppShortcutParameters()
     }
 }

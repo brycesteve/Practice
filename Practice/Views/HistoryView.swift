@@ -92,7 +92,7 @@ struct HistoryView: View {
 }
 
 #Preview {
-    @Previewable @State var historyManager = HistoryManager()
+    @Previewable @State var historyManager = HistoryManager.shared
     HistoryView()
         .environment(historyManager)
 }

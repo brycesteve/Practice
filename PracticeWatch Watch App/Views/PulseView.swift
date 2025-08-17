@@ -79,7 +79,7 @@ struct PulseView: View {
 }
 
 #Preview {
-    @Bindable var practiceManager = PracticeManager()
+    @Bindable var practiceManager = PracticeManager.shared
     
     PulseView(bpm: .constant(100))
 }

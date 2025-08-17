@@ -11,5 +11,6 @@ extension Logger {
     private static let subsystem = Bundle.main.bundleIdentifier ?? "Practice"
     
     static let `default` = Logger(subsystem: subsystem, category: "default")
+    
 }
 
