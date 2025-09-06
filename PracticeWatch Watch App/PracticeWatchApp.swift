@@ -13,6 +13,8 @@ import OSLog
 @main
 struct PracticeWatch_Watch_AppApp: App {
     @Bindable private var practiceManager = PracticeManager.shared
+    @State var appState = WatchAppState()
+    
     
     init(){
         _ = ConnectivityBridge.shared
@@ -44,9 +46,15 @@ struct PracticeWatch_Watch_AppApp: App {
             }
             
             .environment(practiceManager)
+            .environment(appState)
             .onReceive(NotificationCenter.default.publisher(for: .startPractice)) { notification in
                 if let practiceName = notification.object as? String, let practice = Practice(rawValue: practiceName) {
                     practiceManager.selectedPractice = practice
+                }
+            }
+            .onOpenURL { url in
+                if url.absoluteString == "practice://readinessDetail" {
+                    appState.showReadinessDetail = true
                 }
             }
         }
@@ -55,6 +63,10 @@ struct PracticeWatch_Watch_AppApp: App {
     @WKApplicationDelegateAdaptor var appDelegate: AppDelegate
 }
 
+@Observable
+class WatchAppState {
+    var showReadinessDetail = false
+}
 
 class AppDelegate: NSObject, WKApplicationDelegate {
     func applicationDidFinishLaunching() {

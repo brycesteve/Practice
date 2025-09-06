@@ -131,6 +131,7 @@
 				Models/PracticeSegment.swift,
 				PracticeIcon.icon,
 				SharedAssets.xcassets,
+				Views/ReadinessInsightText.swift,
 			);
 			target = AA5389BF2DE208B0008CA062 /* PracticeWatch Watch App */;
 		};

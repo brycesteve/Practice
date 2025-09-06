@@ -55,7 +55,7 @@ extension View {
         manager: CrownRotationManager,
         range: ClosedRange<Double> = 0...100,
         step: Double = 1,
-        sensitivity: DigitalCrownRotationalSensitivity = .medium
+        sensitivity: DigitalCrownRotationalSensitivity = .low
     ) -> some View {
         self.modifier(DigitalCrownModifier(manager: manager, range: range, step: step, sensitivity: sensitivity))
     }

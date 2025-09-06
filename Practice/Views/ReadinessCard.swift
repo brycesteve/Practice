@@ -54,7 +54,6 @@ struct ReadinessCard: View {
                 }
             }
         }
-        .padding()
         .frame(maxWidth: .infinity)
         .onChange(of: manager.readinessScore, initial: true) {
             withAnimation(.easeOut(duration: 0.6)) {

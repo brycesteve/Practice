@@ -43,6 +43,7 @@ struct MetricsView: View {
                             HStack(alignment: .top) {
                                 Text(practiceManager.setDescription)
                                     .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 
                                 Spacer()
                                 Text(practiceManager.setRepsOrDuration)
@@ -142,8 +143,8 @@ struct MetricsView: View {
     MetricsView()
         .environment(practiceManager)
         .onAppear {
-            practiceManager.selectedPractice = .SimpleAndSinisterStretches
-            practiceManager.currentSegmentIndex = 0
+            practiceManager.selectedPractice = .SimpleAndSinister
+            practiceManager.currentSegmentIndex = 1
             practiceManager.currentExerciseIndex = 2
         }
 }

@@ -11,6 +11,7 @@ import AppIntents
 
 struct StartView: View {
     @Environment(PracticeManager.self) var practiceManager
+    @Environment(WatchAppState.self) var appState
     
     @State var navigation = NavigationPath()
     
@@ -19,6 +20,7 @@ struct StartView: View {
     
     
     var body: some View {
+        @Bindable var appState = appState
         @Bindable var manager = practiceManager
         NavigationStack(path: $navigation) {
             List(practiceManager.availablePractices, id: \.name) { practice in
@@ -30,7 +32,7 @@ struct StartView: View {
                 
             }
             
-            .navigationDestination(isPresented: $manager.running, destination: {
+            .navigationDestination(isPresented: $manager.showMetricsView, destination: {
                 SessionPagingView()
             })
             
@@ -41,7 +43,9 @@ struct StartView: View {
 //            })
             
         }
-        
+        .sheet(isPresented: $appState.showReadinessDetail) {
+            ReadinessDetailView()
+        }
         
     }
     

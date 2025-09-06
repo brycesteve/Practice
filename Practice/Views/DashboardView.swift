@@ -4,9 +4,9 @@
 //
 //  Created by Steve Bryce on 06/07/2025.
 //
+
 import SwiftUI
 import HealthKit
-import OSLog
 import Charts
 
 struct DashboardView: View {
@@ -17,81 +17,58 @@ struct DashboardView: View {
     
     var body: some View {
         NavigationStack {
-           List {
-              ReadinessCard()
-                   .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                   .listRowSeparator(.hidden)
-                   .listSectionSeparator(.hidden)
-                   .listRowInsets(.vertical, 8)
-            
-               let current = currentStreak()
-            let longest = longestStreak()
-               
-               HStack {
-                   VStack(alignment: .leading) {
-                       Text("Current Streak")
-                           .font(.caption)
-                           .foregroundStyle(.secondary)
-                       Text("\(current.length) days")
-                           .font(.title3.bold())
-                   }
-                   Spacer()
-                   VStack(alignment: .leading) {
-                       Text("Longest Streak")
-                           .font(.caption)
-                           .foregroundStyle(.secondary)
-                       Text("\(longest.length) days")
-                           .font(.title3.bold())
-                   }
-                   Spacer()
-                   VStack(alignment: .leading) {
-                       Text("Last Workout")
-                           .font(.caption)
-                           .foregroundStyle(.secondary)
-                       Text(relativeDate(of: practices.last?.endDate))
-                           .font(.title3.bold())
-                   }
-               }
-               .padding()
-               .glassEffect(.regular, in: .rect(cornerRadius: 12))
-               .listRowSeparator(.hidden)
-               .listSectionSeparator(.hidden)
-               .listRowInsets(.vertical, 8)
-            
-               
-               //Work/Rest
-               WeeklyMetricsView(practices: practices)
-               .padding()
-               .glassEffect(.regular, in: .rect(cornerRadius: 12))
-               .listRowSeparator(.hidden)
-               .listSectionSeparator(.hidden)
-               .listRowInsets(.vertical, 8)
-               
-               ProgressCard(currentTonnage: rollingAverageWorkoutMass())
-                   .padding()
-                   .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                   .listRowSeparator(.hidden)
-                   .listSectionSeparator(.hidden)
-                   .listRowInsets(.vertical, 8)
-               VO2MaxTrendCard()
-                   .padding()
-                   .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                   .listRowSeparator(.hidden)
-                   .listSectionSeparator(.hidden)
-                   .listRowInsets(.vertical, 8)
+            List {
                 
+                // 🔹 Readiness Card (accent)
+                ReadinessCard()
+                    .padding()
+                    .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                    .listRowSeparator(.hidden)
+                    .listSectionSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                
+                // 🔹 Streak Metrics
+                Grid(horizontalSpacing: 16) {
+                    GridRow {
+                        VStack(alignment: .leading) {
+                            Text("Current Streak").font(.caption).foregroundStyle(.secondary)
+                            Text("\(currentStreak().length) days").font(.title3.bold())
+                        }
+                        VStack(alignment: .leading) {
+                            Text("Longest Streak").font(.caption).foregroundStyle(.secondary)
+                            Text("\(longestStreak().length) days").font(.title3.bold())
+                        }
+                        VStack(alignment: .leading) {
+                            Text("Last Workout").font(.caption).foregroundStyle(.secondary)
+                            Text(relativeDate(of: practices.last?.endDate)).font(.title3.bold())
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .dashboardCardStyle()
+                
+                // 🔹 Weekly Metrics
+                WeeklyMetricsView(practices: practices)
+                    .dashboardCardStyle()
+                
+                // 🔹 Progress Card
+                ProgressCard(currentTonnage: rollingAverageWorkoutMass())
+                    .dashboardCardStyle()
+                
+                // 🔹 VO2Max Trend
+                VO2MaxTrendCard()
+                    .dashboardCardStyle()
             }
-           .scrollContentBackground(.hidden)
-           .listStyle(.plain)
-           .refreshable {
-               await ReadinessManager.shared.refresh()
-           }
+            .scrollContentBackground(.hidden)
+            .listStyle(.plain)
+            .refreshable {
+                await ReadinessManager.shared.refresh()
+            }
             .navigationTitle("Dashboard")
             .task {
                 await updatePractices()
             }
-            .onChange(of: scenePhase, initial: false) {
-                _,newValue in
+            .onChange(of: scenePhase, initial: false) { _, newValue in
                 if newValue == .active {
                     Task {
                         await updatePractices()
@@ -99,8 +76,9 @@ struct DashboardView: View {
                 }
             }
         }
-        
     }
+    
+    // MARK: - Helpers
     
     private func updatePractices() async {
         loadingState.dashboardLoading = true
@@ -111,19 +89,14 @@ struct DashboardView: View {
     
     func totalMass() -> Measurement<UnitMass> {
         let mass = practices.reduce(into: 0) { accum, next in
-            
             accum += next.simpleAndSinisterWeight
         }
-        
         return Measurement(value: Double(mass), unit: UnitMass.kilograms)
     }
     
     func rollingAverageWorkoutMass() -> Double {
         let relevantPractices = practices.suffix(5)
-        guard !relevantPractices.isEmpty else {
-            return 0
-        }
-        
+        guard !relevantPractices.isEmpty else { return 0 }
         let mass = relevantPractices.reduce(into: 0) { accum, next in
             accum += next.simpleAndSinisterWeight
         }
@@ -131,19 +104,31 @@ struct DashboardView: View {
     }
     
     func currentStreak() -> Streak {
-        return practices.calculateCurrentComplianceWorkoutStreak()
+        practices.calculateCurrentComplianceWorkoutStreak()
     }
     
     func longestStreak() -> Streak {
-        return practices.calculateLongestComplianceWorkoutStreak()
+        practices.calculateLongestComplianceWorkoutStreak()
     }
-
+    
     func relativeDate(of date: Date?) -> String {
         guard let date = date else { return "Never" }
         let formatter = RelativeDateTimeFormatter()
         formatter.formattingContext = .standalone
         formatter.dateTimeStyle = .named
         return formatter.string(for: date) ?? ""
+    }
+}
+
+// MARK: - Dashboard Card Style Modifier
+extension View {
+    func dashboardCardStyle() -> some View {
+        self
+            .padding()
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .listRowSeparator(.hidden)
+            .listSectionSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 }
 
@@ -156,5 +141,3 @@ struct DashboardView: View {
             .environment(ReadinessManager.shared)
     }
 }
-
-

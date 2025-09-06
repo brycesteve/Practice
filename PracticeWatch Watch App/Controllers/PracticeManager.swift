@@ -83,6 +83,8 @@ class PracticeManager: NSObject {
         }
     }
     
+    var showMetricsView: Bool = false
+    
     // MARK: - Completed Set Management
     
     /*
@@ -287,6 +289,7 @@ class PracticeManager: NSObject {
         do {
             session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
             builder = session?.associatedWorkoutBuilder()
+            showMetricsView = true
         } catch {
             // Handle any exceptions.
             return
@@ -396,6 +399,7 @@ class PracticeManager: NSObject {
         builder = nil
         workout = nil
         session = nil
+        showMetricsView = false
         activeEnergy = 0
         averageHeartRate = 0
         heartRate = 0

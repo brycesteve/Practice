@@ -30,7 +30,7 @@ struct ReadinessWidgetView: View {
             .tint(scoreColor.gradient)
             .widgetAccentable()
             .containerBackground(.fill.quaternary, for: .widget)
-            
+            .widgetURL(URL(string: "practice://readinessDetail"))
             // Apple Watch rectangular complication
         case .accessoryRectangular:
             HStack {
@@ -53,6 +53,7 @@ struct ReadinessWidgetView: View {
                 .widgetAccentable()
             }
             .containerBackground(.fill.quaternary, for: .widget)
+            .widgetURL(URL(string: "practice://readinessDetail"))
             
             // iPhone widgets
         default:
@@ -73,6 +74,7 @@ struct ReadinessWidgetView: View {
             }
             .widgetAccentable()
             .containerBackground(.fill.quaternary, for: .widget)
+            .widgetURL(URL(string: "practice://readinessDetail"))
         }
     }
     
@@ -97,6 +99,7 @@ struct ReadinessWidget: Widget {
         .description("Shows your current readiness score.")
         #if os(watchOS)
         .supportedFamilies([.accessoryCircular, .accessoryRectangular])
+        
         #else
         .supportedFamilies([
             .systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular

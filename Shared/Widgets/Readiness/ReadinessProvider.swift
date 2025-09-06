@@ -37,6 +37,7 @@ struct ReadinessProvider: TimelineProvider {
             // Mark stale if older than e.g. 12 hours
             let isStale = Date().timeIntervalSince(loaded.date) > 60 * 60 * 2
             return ReadinessEntry(date: .now, readinessScore: loaded.score, isStale: isStale)
+            
         } else {
             return ReadinessEntry(date: .now, readinessScore: 0, isStale: true)
         }
