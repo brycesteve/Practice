@@ -53,6 +53,9 @@ struct ReadinessDetailView: View {
             .padding()
         }
         .navigationTitle("Readiness")
+        .task {
+            await manager.refresh()
+        }
     }
     
     private func metric(icon: String, color: Color, value: String, label: String) -> some View {
