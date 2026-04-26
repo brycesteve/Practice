@@ -79,7 +79,7 @@ struct MetricsView: View {
                         .scenePadding()
                 }
             }
-            .withDigitalCrown(manager: crownManager)
+            //.withDigitalCrown(manager: crownManager)
             .onChange(of: showTimerHash, initial: true) {
                 _,_ in
                 if practiceManager.showExerciseTimer {
@@ -87,9 +87,9 @@ struct MetricsView: View {
                 }
             }
            .onAppear {
-                crownManager.onTrigger = {
-                    manualAdvance()
-                }
+//                crownManager.onTrigger = {
+//                    manualAdvance()
+//                }
             }
         }
         

@@ -127,10 +127,14 @@
 				Intents/PracticeQuery.swift,
 				Logger.swift,
 				Models/Exercise.swift,
+				Models/PlannedExercise.swift,
 				Models/Practice.swift,
 				Models/PracticeSegment.swift,
+				Models/RoutineType.swift,
+				Models/WorkoutPlan.swift,
 				PracticeIcon.icon,
 				SharedAssets.xcassets,
+				Store/PlanStore.swift,
 				Views/ReadinessInsightText.swift,
 			);
 			target = AA5389BF2DE208B0008CA062 /* PracticeWatch Watch App */;
