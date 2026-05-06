@@ -4,7 +4,20 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>net.stevebryce.readiness.refresh</string>
+		<string>net.stevebryce.practice.recoveryRefresh</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>net.stevebryce.practice</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>training</string>
+			</array>
+		</dict>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

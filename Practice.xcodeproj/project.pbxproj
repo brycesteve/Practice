@@ -100,51 +100,35 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AA47CD982E22A69E008AE45B /* Exceptions for "Shared" folder in "Practice" target */ = {
+		AA323EF92FA635DB00FC6286 /* Exceptions for "Practice" folder in "Practice" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Models/CompletedPractice.swift,
-				Widgets/Readiness/ReadinessProvider.swift,
-				Widgets/Readiness/ReadinessWidget.swift,
+				Info.plist,
 			);
 			target = AA5389AD2DE2083D008CA062 /* Practice */;
 		};
 		AA5389E62DE20B07008CA062 /* Exceptions for "Shared" folder in "PracticeWatch Watch App" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Controllers/ConnectivityBridge.swift,
-				Controllers/Readiness/ReadinessManager.swift,
-				Controllers/Readiness/ReadinessMetric.swift,
-				Controllers/Readiness/ReadinessMetrics.swift,
-				Controllers/Readiness/SleepConsistency.swift,
-				Controllers/SharedIDs.swift,
-				"Extensions/Date+Extensions.swift",
-				"Extensions/HealthKit+Extensions.swift",
-				"Extensions/Measurement+Extension.swift",
-				"Extensions/UserDefaults+extension.swift",
-				FormatStyles/PracticeMassFormatStyle.swift,
-				Intents/PracticeEntity.swift,
-				Intents/PracticeQuery.swift,
+				Data/Exercises.swift,
+				Data/Models.swift,
+				Data/Schema.swift,
+				Data/Schemas/TrainingSchemaV1.swift,
+				Data/SkillProgressions.swift,
+				Data/Skills.swift,
+				Data/WorkoutData.swift,
+				Engine/HealthKitManager.swift,
+				Engine/NotificationManager.swift,
+				Engine/ProgressionEngine.swift,
+				Engine/RecoveryEngine.swift,
+				Engine/WatchConnectivityManager.swift,
+				Errors/ErrorBanner.swift,
+				Errors/ErrorState.swift,
 				Logger.swift,
-				Models/Exercise.swift,
-				Models/PlannedExercise.swift,
-				Models/Practice.swift,
-				Models/PracticeSegment.swift,
-				Models/RoutineType.swift,
-				Models/WorkoutPlan.swift,
 				PracticeIcon.icon,
 				SharedAssets.xcassets,
-				Store/PlanStore.swift,
-				Views/ReadinessInsightText.swift,
 			);
 			target = AA5389BF2DE208B0008CA062 /* PracticeWatch Watch App */;
-		};
-		AA5EAEDA2E43EE0100A2743F /* Exceptions for "Practice" folder in "Practice" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = AA5389AD2DE2083D008CA062 /* Practice */;
 		};
 		AA5EAEF32E43F35100A2743F /* Exceptions for "PracticeWatchWidgetExtension" folder in "PracticeWatchWidgetExtensionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
@@ -156,11 +140,20 @@
 		AA5EAEF62E43F3DD00A2743F /* Exceptions for "Shared" folder in "PracticeWatchWidgetExtensionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Controllers/SharedIDs.swift,
+				Data/Exercises.swift,
+				Data/Models.swift,
+				Data/Schema.swift,
+				Data/Schemas/TrainingSchemaV1.swift,
+				Data/SkillProgressions.swift,
+				Data/Skills.swift,
+				Data/WorkoutData.swift,
+				Engine/HealthKitManager.swift,
+				Engine/NotificationManager.swift,
+				Engine/ProgressionEngine.swift,
+				Engine/RecoveryEngine.swift,
+				Engine/WatchConnectivityManager.swift,
 				Logger.swift,
 				SharedAssets.xcassets,
-				Widgets/Readiness/ReadinessProvider.swift,
-				Widgets/Readiness/ReadinessWidget.swift,
 			);
 			target = AA5EAEDE2E43F34F00A2743F /* PracticeWatchWidgetExtensionExtension */;
 		};
@@ -174,25 +167,26 @@
 		AA5EAF122E4919E500A2743F /* Exceptions for "Shared" folder in "PracticeWidgetExtensionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Controllers/SharedIDs.swift,
+				Data/Exercises.swift,
+				Data/Models.swift,
+				Data/Schema.swift,
+				Data/Schemas/TrainingSchemaV1.swift,
+				Data/SkillProgressions.swift,
+				Data/Skills.swift,
+				Data/WorkoutData.swift,
+				Engine/HealthKitManager.swift,
+				Engine/NotificationManager.swift,
+				Engine/ProgressionEngine.swift,
+				Engine/RecoveryEngine.swift,
+				Engine/WatchConnectivityManager.swift,
 				Logger.swift,
 				SharedAssets.xcassets,
-				Widgets/Readiness/ReadinessProvider.swift,
-				Widgets/Readiness/ReadinessWidget.swift,
 			);
 			target = AA5EAEFD2E4919BF00A2743F /* PracticeWidgetExtensionExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		AA5389B02DE2083D008CA062 /* Practice */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				AA5EAEDA2E43EE0100A2743F /* Exceptions for "Practice" folder in "Practice" target */,
-			);
-			path = Practice;
-			sourceTree = "<group>";
-		};
 		AA5389C12DE208B0008CA062 /* PracticeWatch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "PracticeWatch Watch App";
@@ -201,7 +195,6 @@
 		AA5389E12DE20AF1008CA062 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				AA47CD982E22A69E008AE45B /* Exceptions for "Shared" folder in "Practice" target */,
 				AA5389E62DE20B07008CA062 /* Exceptions for "Shared" folder in "PracticeWatch Watch App" target */,
 				AA5EAEF62E43F3DD00A2743F /* Exceptions for "Shared" folder in "PracticeWatchWidgetExtensionExtension" target */,
 				AA5EAF122E4919E500A2743F /* Exceptions for "Shared" folder in "PracticeWidgetExtensionExtension" target */,
@@ -223,6 +216,14 @@
 				AA5EAF0F2E4919C100A2743F /* Exceptions for "PracticeWidgetExtension" folder in "PracticeWidgetExtensionExtension" target */,
 			);
 			path = PracticeWidgetExtension;
+			sourceTree = "<group>";
+		};
+		AAC5CD0C2FA2117400F116CD /* Practice */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA323EF92FA635DB00FC6286 /* Exceptions for "Practice" folder in "Practice" target */,
+			);
+			path = Practice;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -270,7 +271,7 @@
 				AA66813F2E50E0330046E95A /* PracticeWatchWidgetExtensionExtension.entitlements */,
 				AA21ACF42DFF732C00574CCF /* Launch Screen.storyboard */,
 				AA5389E12DE20AF1008CA062 /* Shared */,
-				AA5389B02DE2083D008CA062 /* Practice */,
+				AAC5CD0C2FA2117400F116CD /* Practice */,
 				AA5EAEE52E43F34F00A2743F /* PracticeWatchWidgetExtension */,
 				AA5EAF012E4919BF00A2743F /* PracticeWidgetExtension */,
 				AA5EAEE02E43F34F00A2743F /* Frameworks */,
@@ -319,8 +320,8 @@
 				AA5EAF0A2E4919C100A2743F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				AA5389B02DE2083D008CA062 /* Practice */,
 				AA5389E12DE20AF1008CA062 /* Shared */,
+				AAC5CD0C2FA2117400F116CD /* Practice */,
 			);
 			name = Practice;
 			packageProductDependencies = (
@@ -406,7 +407,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2600;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2640;
 				TargetAttributes = {
 					AA5389AD2DE2083D008CA062 = {
 						CreatedOnToolsVersion = 16.3;
@@ -750,7 +751,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
 			};
 			name = Debug;
 		};
@@ -785,7 +786,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
 			};
 			name = Release;
 		};
@@ -801,6 +802,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PracticeWatchWidgetExtension;
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Update Readiness";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -822,7 +824,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
 			};
 			name = Debug;
 		};
@@ -838,6 +840,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PracticeWatchWidgetExtension;
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Update Readiness";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -859,7 +862,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
-				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+				WATCHOS_DEPLOYMENT_TARGET = 10.6;
 			};
 			name = Release;
 		};
@@ -875,6 +878,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PracticeWidgetExtension;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Compute readiness";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -907,6 +911,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PracticeWidgetExtension;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Compute readiness";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
