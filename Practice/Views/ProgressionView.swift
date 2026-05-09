@@ -159,6 +159,7 @@ struct SkillDetailView: View {
                   systemImage: "flag.checkered")
             .font(.caption).foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
     }
@@ -172,6 +173,7 @@ struct SkillDetailView: View {
             Text(level.name).font(.headline)
             Text(level.details).font(.caption).foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 14))
     }

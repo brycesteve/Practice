@@ -7,6 +7,8 @@ import SwiftData
 @main
 struct TrainingApp: App {
     
+    @Environment(\.scenePhase) var scenePhase
+    
     private let container: ModelContainer = {
         do { return try ModelContainer.makeiOS() }
         catch { fatalError("Failed to create SwiftData/CloudKit container: \(error)") }
@@ -29,6 +31,12 @@ struct TrainingApp: App {
         }
         .modelContainer(container)
         .environment(errorState)
+        .onChange(of: scenePhase, initial: true) { _, phase  in
+            if phase == .active {
+                BackgroundTaskManager.shared.scheduleNextRefresh()
+            }
+            
+        }
     }
     
     private func onLaunch() async {
@@ -38,7 +46,7 @@ struct TrainingApp: App {
         _ = try? await NotificationManager.shared.requestAuthorization()
         
         BackgroundTaskManager.shared.enableHealthKitBackgroundDelivery(modelContainer: container)
-        BackgroundTaskManager.shared.scheduleNextRefresh()
+        //BackgroundTaskManager.shared.scheduleNextRefresh()
         
         WatchConnectivityManager.shared.activate()
         WatchConnectivityManager.shared.delegate = wcDelegate

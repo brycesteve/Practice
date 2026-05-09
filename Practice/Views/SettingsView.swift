@@ -120,6 +120,17 @@ struct SettingsView: View {
                 } header: {
                     Label("Weekly Weigh-In", systemImage: "scalemass")
                 }
+                
+#if DEBUG
+                
+                Button("Promote CloudKit Schema") {
+                    
+                    CloudKitSchemaPromotionEngine
+                        .run(container: modelContext.container)
+                    
+                }
+                
+#endif
             }
             .navigationTitle("Settings")
             .task {

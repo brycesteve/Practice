@@ -12,17 +12,18 @@ import SwiftData
 struct TrainingWidgetEntry: TimelineEntry {
     let date: Date
     let readinessScore: Double?
-    let readinessLabel: String
-    let trainedToday: Bool
-    let restDayToday: Bool
-    let consistencyPercent: Double
-    let trainedLast7: Int
-    let tonightSkill: String
+    let readinessLabel: String = ""
+    let tonightSkill: String = "Planche"
+    let restDayToday: Bool = false
+    let trainedToday: Bool = false
+    let trainedLast7: Int = 0
+    let consistencyPercent: Double = 100
     
     static var placeholder: TrainingWidgetEntry {
-        TrainingWidgetEntry(date: .now, readinessScore: 74, readinessLabel: "Good",
-                            trainedToday: false, restDayToday: false,
-                            consistencyPercent: 80, trainedLast7: 4, tonightSkill: "Handstand")
+        TrainingWidgetEntry(
+            date: .now,
+            readinessScore: 0
+        )
     }
 }
 
@@ -32,125 +33,23 @@ struct TrainingWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> TrainingWidgetEntry { .placeholder }
     
     func getSnapshot(in context: Context, completion: @escaping (TrainingWidgetEntry) -> Void) {
-        Task { completion(await buildEntry()) }
+        completion(buildEntry())
     }
     
     func getTimeline(in context: Context, completion: @escaping (Timeline<TrainingWidgetEntry>) -> Void) {
-        Task {
-            let base  = await buildEntry()
-            let cal   = Calendar.current
-            
-            // Generate one entry per hour for the next 24 hours.
-            // Each entry uses the same cached score — WidgetKit picks the
-            // entry whose date is closest to the current time.
-            // When BackgroundTaskManager computes a new score it calls
-            // reloadAllTimelines(), which invalidates this schedule immediately.
-            var entries: [TrainingWidgetEntry] = []
-            for hour in 0..<24 {
-                let entryDate = cal.date(byAdding: .hour, value: hour, to: Date()) ?? Date()
-                let entry = TrainingWidgetEntry(
-                    date:                entryDate,
-                    readinessScore:      base.readinessScore,
-                    readinessLabel:      base.readinessLabel,
-                    trainedToday:        base.trainedToday,
-                    restDayToday:        base.restDayToday,
-                    consistencyPercent:  base.consistencyPercent,
-                    trainedLast7:        base.trainedLast7,
-                    tonightSkill:        base.tonightSkill
-                )
-                entries.append(entry)
-            }
-            
-            // After 24 hours rebuild from scratch
-            let expiry = cal.date(byAdding: .hour, value: 24, to: Date()) ?? Date()
-            completion(Timeline(entries: entries, policy: .after(expiry)))
-        }
+        let entry = buildEntry()
+        let expiry = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
+         
+        completion(Timeline(entries: [entry], policy: .after(expiry)))
+        
     }
     
-    @MainActor
-    private func buildEntry() async -> TrainingWidgetEntry {
-        guard let container = try? ModelContainer.makeiOS() else { return .placeholder }
-        let context = container.mainContext
-        let cal = Calendar.current
-        let today = cal.startOfDay(for: Date())
-        
-        // Recovery score
-        let scoreDesc = FetchDescriptor<RecoveryScoreRecord>(
-            predicate: #Predicate { $0.date >= today },
-            sortBy: [SortDescriptor(\RecoveryScoreRecord.date, order: .reverse)]
-        )
-        var scoreRecord = try? context.fetch(scoreDesc).first
-        
-        // Fallback: if no cached score exists for today, compute one now.
-        // This runs on first launch before background delivery has fired.
-        if scoreRecord == nil {
-            if let computed = try? await RecoveryEngine().computeScore() {
-                let fresh = RecoveryScoreRecord(date: today, overallScore: computed.overall)
-                fresh.hrvScore             = computed.hrvContribution
-                fresh.restingHRScore       = computed.restingHRContribution
-                fresh.sleepDurationScore   = computed.sleepDurationContribution
-                fresh.sleepQualityScore    = computed.sleepQualityContribution
-                fresh.respiratoryRateScore = computed.respiratoryContribution
-                fresh.trainingLoadScore    = computed.trainingLoadContribution
-                fresh.hrv                  = computed.metrics.hrv
-                fresh.restingHR            = computed.metrics.restingHeartRate
-                fresh.sleepHours           = computed.metrics.sleepDuration
-                fresh.respiratoryRate      = computed.metrics.respiratoryRate
-                fresh.activeEnergyYesterday = computed.metrics.activeEnergyYesterday
-                context.insert(fresh)
-                try? context.save()
-                scoreRecord = fresh
-            }
-        }
-        
-        // Today's workout / rest day
-        let workoutDesc = FetchDescriptor<WorkoutRecord>(
-            predicate: #Predicate { $0.startDate >= today }
-        )
-        let trainedToday = (try? context.fetchCount(workoutDesc)) ?? 0 > 0
-        
-        let restDesc = FetchDescriptor<RestDayRecord>(
-            predicate: #Predicate { $0.date >= today }
-        )
-        let restDayToday = (try? context.fetchCount(restDesc)) ?? 0 > 0
-        
-        // Last 7 days
-        let sevenDaysAgo = cal.date(byAdding: .day, value: -6, to: today)!
-        let recentDesc = FetchDescriptor<WorkoutRecord>(
-            predicate: #Predicate { $0.startDate >= sevenDaysAgo }
-        )
-        let trainedLast7 = (try? context.fetchCount(recentDesc)) ?? 0
-        
-        // Consistency (last 28 days, 5/7 target)
-        let start28 = cal.date(byAdding: .day, value: -27, to: today)!
-        var credited = 0; var elapsed = 0
-        for offset in 0..<28 {
-            let day = cal.date(byAdding: .day, value: offset, to: start28)!
-            let dayEnd = cal.date(byAdding: .day, value: 1, to: day)!
-            guard day <= today else { break }
-            elapsed += 1
-            let wDesc = FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.startDate >= day && $0.startDate < dayEnd })
-            let rDesc = FetchDescriptor<RestDayRecord>(predicate: #Predicate { $0.date >= day && $0.date < dayEnd })
-            if ((try? context.fetchCount(wDesc)) ?? 0) > 0 ||
-                ((try? context.fetchCount(rDesc)) ?? 0) > 0 { credited += 1 }
-        }
-        let target = max(1, Int((Double(elapsed) * 5.0 / 7.0).rounded()))
-        let consistency = min(Double(credited) / Double(target), 1.0) * 100
-        
-        // Tonight's skill
-        let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
-        let skillNames = Skill.activeSkills.map { $0.rawValue }
-        let tonight = skillNames[(settings?.eveningRotationDay ?? 0) % Skill.activeSkills.count]
+    private func buildEntry() -> TrainingWidgetEntry {
+        let context = AppGroupDefaults.shared.loadAppContext()
         
         return TrainingWidgetEntry(
             date: .now,
-            readinessScore: scoreRecord?.overallScore,
-            readinessLabel: scoreRecord?.readinessLabel ?? "–",
-            trainedToday: trainedToday,
-            restDayToday: restDayToday,
-            consistencyPercent: consistency,
-            trainedLast7: trainedLast7,
-            tonightSkill: tonight
+            readinessScore: context.recoveryData?.overallScore
         )
     }
 }

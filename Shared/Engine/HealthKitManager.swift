@@ -41,7 +41,8 @@ public final class HealthKitManager: NSObject, Sendable {
         HKQuantityType(.respiratoryRate),
         HKCategoryType(.sleepAnalysis),
         HKCharacteristicType(.dateOfBirth),
-        HKCharacteristicType(.biologicalSex)
+        HKCharacteristicType(.biologicalSex),
+        HKQuantityType(.heartRateVariabilitySDNN)
     ]
     
     // MARK: - Authorization

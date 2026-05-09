@@ -28,7 +28,7 @@ enum TrainingSchemaV1: VersionedSchema {
     // MARK: - Workout Records
     
     @Model
-    public final class WorkoutRecord {
+    public final class WorkoutRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var sessionTypeRaw: String = ""
         public var startDate: Date = Date()
@@ -86,10 +86,41 @@ enum TrainingSchemaV1: VersionedSchema {
                 hkWorkoutUUID: hkWorkoutUUID
             )
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            let w = Self.init(
+                from: CompletedWorkout(
+                    sessionType: .morning,
+                    startDate: Date(),
+                    endDate: Date(),
+                    exercises: [
+                        CompletedExercise(
+                            exerciseID: UUID(),
+                            exerciseName: "Test",
+                            sets: [
+                                CompletedSet(
+                                    reps: 1,
+                                    durationSeconds: 30,
+                                    feltDifficulty: .easy,
+                                    tguSide: .left
+                                )
+                            ]
+                        )
+                    ],
+                    activeCalories: 100,
+                    averageHeartRate: 100,
+                    peakHeartRate: 120,
+                    hkWorkoutUUID: UUID()
+                )
+            )
+            w.notes = ""
+            return w
+        }
     }
     
+    
     @Model
-    public final class ExerciseRecord {
+    public final class ExerciseRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var exerciseID: UUID = UUID()
         public var exerciseName: String = ""
@@ -123,10 +154,51 @@ enum TrainingSchemaV1: VersionedSchema {
                 skillLevel: skillLevel
             )
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            let w = WorkoutRecord(
+                from: CompletedWorkout(
+                    sessionType: .morning,
+                    startDate: Date(),
+                    endDate: Date(),
+                    exercises: [
+                        CompletedExercise(
+                            exerciseID: UUID(),
+                            exerciseName: "Test",
+                            sets: [
+                                CompletedSet(
+                                    reps: 1,
+                                    durationSeconds: 30,
+                                    feltDifficulty: .easy,
+                                    tguSide: .left
+                                )
+                            ]
+                        )
+                    ],
+                    activeCalories: 100,
+                    averageHeartRate: 100,
+                    hkWorkoutUUID: UUID()
+                )
+            )
+            let ex = ExerciseRecord(
+                from: CompletedExercise(exerciseID: UUID(), exerciseName: "Test", sets: [
+                    CompletedSet(
+                        id: UUID(),
+                        reps: 2,
+                        durationSeconds: 30,
+                        feltDifficulty: .easy,
+                        tguSide: .left
+                    )
+                ], skillLevel: 1)
+            )
+            ex.sortIndex = 1
+            ex.workout = w
+            return ex
+        }
     }
     
     @Model
-    public final class SetRecord {
+    public final class SetRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var reps: Int? = nil
         public var durationSeconds: Int? = nil
@@ -160,12 +232,36 @@ enum TrainingSchemaV1: VersionedSchema {
                 feltDifficulty: feltDifficulty, tguSide: tguSide
             )
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            let ex = ExerciseRecord(
+                from: CompletedExercise(exerciseID: UUID(), exerciseName: "Test", sets: [
+                    CompletedSet(
+                        id: UUID(),
+                        reps: 2,
+                        durationSeconds: 30,
+                        feltDifficulty: .easy,
+                        tguSide: .left
+                    )
+                ], skillLevel: 1)
+            )
+            let set = SetRecord(from: CompletedSet(
+                id: UUID(),
+                reps: 2,
+                durationSeconds: 30,
+                feltDifficulty: .easy,
+                tguSide: .left
+            ), sortIndex: 1)
+            set.exercise = ex
+            return set
+            
+        }
     }
     
     // MARK: - Skill Progression
     
     @Model
-    public final class SkillProgressionRecord {
+    public final class SkillProgressionRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var skillName: String = ""
         public var currentLevel: Int = 1
@@ -189,12 +285,16 @@ enum TrainingSchemaV1: VersionedSchema {
         public func toSkillProgression() -> SkillProgression {
             SkillProgression(id: id, skillName: skillName, levels: levels, currentLevel: currentLevel)
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            SkillProgressionRecord(from: SkillProgressions.handstand)
+        }
     }
     
     // MARK: - Skill Session
     
     @Model
-    public final class SkillSessionRecord {
+    public final class SkillSessionRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var date: Date = Date()
         public var skillProgressionID: UUID = UUID()
@@ -232,11 +332,23 @@ enum TrainingSchemaV1: VersionedSchema {
                 sets: (sets ?? []).map { $0.toCompletedSet() }
             )
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            SkillSessionRecord(
+                from: SkillSessionEntry(skillProgressionID: UUID(), level: 1, sets: [
+                    CompletedSet(
+                        id: UUID(),
+                        durationSeconds: 30,
+                        feltDifficulty: .easy
+                    )
+                ])
+            )
+        }
     }
     
     /// Separate set model for skill sessions (avoids ambiguity with workout SetRecord)
     @Model
-    public final class SkillSetRecord {
+    public final class SkillSetRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var reps: Int? = nil
         public var durationSeconds: Int? = nil
@@ -260,12 +372,32 @@ enum TrainingSchemaV1: VersionedSchema {
         public func toCompletedSet() -> CompletedSet {
             CompletedSet(id: id, reps: reps, durationSeconds: durationSeconds, feltDifficulty: feltDifficulty)
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            let sess = SkillSessionRecord(
+                from: SkillSessionEntry(skillProgressionID: UUID(), level: 1, sets: [
+                    CompletedSet(
+                        id: UUID(),
+                        durationSeconds: 30,
+                        feltDifficulty: .easy
+                    )
+                ])
+            )
+            let set = SkillSetRecord(from: CompletedSet(
+                id: UUID(),
+                reps: 3,
+                durationSeconds: 30,
+                feltDifficulty: .easy
+            ), sortIndex: 0)
+            set.session = sess
+            return set
+        }
     }
     
     // MARK: - Kettlebell Weight Record
     
     @Model
-    public final class KettlebellWeightRecord {
+    public final class KettlebellWeightRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var date: Date = Date()
         public var exerciseTypeRaw: String = ""
@@ -289,12 +421,24 @@ enum TrainingSchemaV1: VersionedSchema {
             self.reps            = reps
             self.notes           = notes
         }
+        
+        static func makeSeed() -> any PersistentModel {
+            KettlebellWeightRecord(
+                id: UUID(),
+                date: Date(),
+                exerciseType: .swing,
+                weightKg: 16,
+                sets: 10,
+                reps: 10,
+                notes: ""
+            )
+        }
     }
     
     // MARK: - App Settings
     
     @Model
-    public final class AppSettings {
+    public final class AppSettings: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var targetSwingWeightKg: Double = 32
         public var targetTGUWeightKg: Double = 32
@@ -309,12 +453,16 @@ enum TrainingSchemaV1: VersionedSchema {
         public static var womenSimple: (swing: Double, tgu: Double) { (24, 16) }
         
         public init() {}
+        
+        static func makeSeed() -> any PersistentModel {
+            AppSettings()
+        }
     }
     
     // MARK: - Recovery Score Record
     
     @Model
-    public final class RecoveryScoreRecord {
+    public final class RecoveryScoreRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var date: Date = Date()
         public var overallScore: Double = 0
@@ -345,18 +493,55 @@ enum TrainingSchemaV1: VersionedSchema {
             self.date         = date
             self.overallScore = overallScore
         }
+        
+        func toDTO() -> RecoveryDataDTO {
+            var dto = RecoveryDataDTO()
+            dto.overallScore = self.overallScore
+            dto.hrvScore = self.hrvScore
+            dto.restingHRScore = self.restingHRScore
+            dto.sleepDurationScore = self.sleepDurationScore
+            dto.sleepQualityScore = self.sleepQualityScore
+            dto.respiratoryRateScore = self.respiratoryRateScore
+            dto.trainingLoadScore = self.trainingLoadScore
+            dto.hrv = self.hrv
+            dto.restingHR = self.restingHR
+            dto.sleepHours = self.sleepHours
+            dto.respiratoryRate = self.respiratoryRate
+            dto.activeEnergyYesterday = self.activeEnergyYesterday
+            return dto
+        }
+        
+        static func makeSeed() -> any PersistentModel {
+            let r = RecoveryScoreRecord(date: Date(), overallScore: 100)
+            r.hrvScore = 18
+            r.restingHRScore = 20
+            r.sleepDurationScore = 10
+            r.sleepQualityScore = 10
+            r.respiratoryRateScore = 20
+            r.trainingLoadScore = 30
+            r.hrv = 14
+            r.restingHR = 80
+            r.sleepHours = 8
+            r.respiratoryRate = 15
+            r.activeEnergyYesterday = 120
+            return r
+        }
     }
     
     // MARK: - Rest Day Record
     
     @Model
-    public final class RestDayRecord {
+    public final class RestDayRecord: CloudKitSchemaSeedable {
         public var id: UUID = UUID()
         public var date: Date = Calendar.current.startOfDay(for: .now)
         
         public init(id: UUID = UUID(), date: Date = Calendar.current.startOfDay(for: .now)) {
             self.id   = id
             self.date = date
+        }
+        
+        static func makeSeed() -> any PersistentModel {
+            RestDayRecord()
         }
     }
     

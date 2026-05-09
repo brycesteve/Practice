@@ -136,6 +136,8 @@ public final class BackgroundTaskManager {
     /// Safe to call from background — creates its own model context.
     @MainActor
     func computeAndCacheScore(modelContainer: ModelContainer) async {
+        let oldContext = AppGroupDefaults.shared.loadAppContext()
+        let oldScore = oldContext.recoveryData?.overallScore ?? 0
         do {
             let engine = RecoveryEngine()
             let result = try await engine.computeScore()
@@ -174,50 +176,27 @@ public final class BackgroundTaskManager {
             try context.save()
             
             // Fire low-recovery notification if warranted
-            if result.overall < 35 {
+            // Check against last to avoid repeated triggers
+            if result.overall < 35, result.overall < oldScore {
                 NotificationManager.shared.notifyLowRecovery(score: result.overall)
             }
             
-            // Reload complication timelines so the watch face shows the fresh score
+            let recoveryData = record.toDTO()
+            // Save to AppGroup and reload complication timelines
+            AppGroupDefaults.shared.updateRecoveryData(recoveryData)
             WidgetCenter.shared.reloadAllTimelines()
             
             // Push updated score to watch via WatchConnectivity
-            await syncScoreToWatch(result.overall, modelContainer: modelContainer)
+            syncScoreToWatch()
             
         } catch {
             print("Background recovery compute error: \(error)")
         }
     }
     
-    /// Build a full WCSyncPayload from SwiftData and send it to the watch.
-    /// Called after every background recovery score write so the watch
-    /// complication and WatchRecoveryView stay current without touching HealthKit.
-    @MainActor private func syncScoreToWatch(_ score: Double, modelContainer: ModelContainer) async {
-        do {
-            let context = modelContainer.mainContext
-            
-            // Fetch skill progressions
-            let progressionRecords = try context.fetch(FetchDescriptor<SkillProgressionRecord>())
-            let progressions = progressionRecords.map { $0.toSkillProgression() }
-            
-            // Fetch settings
-            let settings = try context.fetch(FetchDescriptor<AppSettings>()).first ?? AppSettings()
-            
-            // Fetch recent workout count
-            let workoutCount = try context.fetchCount(FetchDescriptor<WorkoutRecord>())
-            
-            let payload = WCSyncPayload(
-                skillProgressions: progressions,
-                eveningRotationDay: settings.eveningRotationDay,
-                targetSwingWeightKg: settings.targetSwingWeightKg,
-                targetTGUWeightKg: settings.targetTGUWeightKg,
-                recentWorkoutCount: workoutCount,
-                todayRecoveryScore: score
-            )
-            
-            WatchConnectivityManager.shared.sendFullSync(payload: payload)
-        } catch {
-            print("syncScoreToWatch error: \(error)")
-        }
+    private func syncScoreToWatch() {
+        let context = AppGroupDefaults.shared.loadAppContext()
+        WatchConnectivityManager.shared.sendFullSync(payload: context)
     }
+    
 }

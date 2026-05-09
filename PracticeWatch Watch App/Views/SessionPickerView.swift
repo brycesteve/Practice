@@ -4,22 +4,12 @@ import SwiftUI
 import SwiftData
 
 struct SessionPickerView: View {
-    @Query private var settingsResults: [AppSettings]
-    @Query private var progressions: [SkillProgressionRecord]
-    @Query private var restDays: [RestDayRecord]
-    @Environment(\.modelContext) private var modelContext
     @Environment(ErrorState.self) private var errorState
     
-    private var settings: AppSettings {
-        if let s = settingsResults.first { return s }
-        let s = AppSettings()
-        modelContext.insert(s)
-        try? modelContext.save()
-        return s
-    }
+    @State private var settings = AppGroupDefaults.shared.loadAppContext()
     
     private var isRestDayToday: Bool {
-        restDays.contains { Calendar.current.isDateInToday($0.date) }
+        settings.restDays.contains { Calendar.current.isDateInToday($0) }
     }
     
     private var rotationLabel: String {
@@ -81,7 +71,7 @@ struct SessionPickerView: View {
                 WorkoutGuideView(plan: plan(for: type))
             }
             .onAppear {
-                ensureDefaultProgressions()
+                
                 requestSyncIfNeeded()
             }
             .navigationTitle("Practice")
@@ -91,29 +81,25 @@ struct SessionPickerView: View {
     // MARK: - Rest day
     
     private func toggleRestDay() {
-        let isCurrentlyRest = restDays.contains { Calendar.current.isDateInToday($0.date) }
+        let isCurrentlyRest = isRestDayToday
         
+        var newRestDays = settings.restDays
         if isCurrentlyRest {
-            restDays
-                .filter { Calendar.current.isDateInToday($0.date) }
-                .forEach { modelContext.delete($0) }
+            newRestDays = settings.restDays.filter { !Calendar.current.isDateInToday($0)}
         } else {
-            modelContext.insert(RestDayRecord())
+            newRestDays.append(Date())
         }
-        
-        do {
-            try modelContext.save()
-            // Sync rest day state to iOS so its consistency score stays accurate
-            WatchConnectivityManager.shared.sendRestDay(isRestDay: !isCurrentlyRest)
-        } catch {
-            errorState.post("Could not save rest day.")
-        }
+    
+        AppGroupDefaults.shared.updateRestDays(newRestDays)
+        settings = AppGroupDefaults.shared.loadAppContext()
+        // Sync rest day state to iOS so its consistency score stays accurate
+        WatchConnectivityManager.shared.sendRestDay(isRestDay: !isCurrentlyRest)
     }
     
     // MARK: - Session plan
     
     private func plan(for type: SessionType) -> SessionPlan {
-        let valueProgressions = progressions.map { $0.toSkillProgression() }
+        let valueProgressions = settings.skillProgressions
         switch type {
         case .morning:
             return SessionPlan(sessionType: .morning, steps: WorkoutData.morningSteps, estimatedDurationMinutes: 60)
@@ -132,11 +118,11 @@ struct SessionPickerView: View {
     // MARK: - First-launch setup
     
     private func ensureDefaultProgressions() {
-        let existingNames = Set(progressions.map { $0.skillName })
+        let existingNames = Set(settings.skillProgressions.map { $0.skillName })
         for def in SkillProgressions.defaultSkillProgressions where !existingNames.contains(def.skillName) {
-            modelContext.insert(SkillProgressionRecord(from: def))
+            settings.addSkillProgression(def)
         }
-        try? modelContext.save()
+        settings = AppGroupDefaults.shared.loadAppContext()
     }
     
     /// Silently request a full sync from iOS on first launch (no settings yet)

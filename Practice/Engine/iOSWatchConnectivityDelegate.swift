@@ -35,6 +35,18 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
             guard let isRestDay = notification.userInfo?["isRestDay"] as? Bool else { return }
             Task { await self?.handleRestDay(isRestDay: isRestDay) }
         }
+        
+        NotificationCenter.default.addObserver(
+            forName: .rotationDayReceived,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let rotationDay = notification.userInfo?["rotationDay"] as? Int
+            else { return }
+            Task {
+                await self?.handleRotationDay(rotationDay)
+            }
+        }
     }
     
     // MARK: - WatchConnectivityDelegate
@@ -113,7 +125,12 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
             }
         }
         
-        do { try context.save() }
+        do {
+            let progressionRecords = try context.fetch(FetchDescriptor<SkillProgressionRecord>())
+            let progressions       = progressionRecords.map { $0.toSkillProgression() }
+            AppGroupDefaults.shared.updateSkillProgressions(progressions)
+            try context.save()
+        }
         catch { print("didReceiveSkillEntry save error: \(error)") }
         
         // Send refreshed sync back so watch has updated progression level
@@ -152,6 +169,13 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
             )
         }
         
+        switch transfer.exerciseType {
+        case .swing:
+            AppGroupDefaults.shared.updateLastSwingWeight(transfer.weightKg)
+        case .tgu:
+            AppGroupDefaults.shared.updateLastTGUWeight(transfer.weightKg)
+        }
+        
         do { try context.save() }
         catch { print("didReceiveKettlebellEntry save error: \(error)") }
     }
@@ -185,43 +209,39 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
                 existing.forEach { context.delete($0) }
                 try context.save()
             }
+            let newRestDays = try context.fetch(
+                FetchDescriptor<RestDayRecord>(predicate: #Predicate { $0.date >= today })
+            )
+            let restDaysMapped = newRestDays.map { $0.date }
+            AppGroupDefaults.shared.updateRestDays(restDaysMapped)
         } catch {
             print("handleRestDay error: \(error)")
         }
     }
     
-    // MARK: - Build and send full sync payload to watch
+    private func handleRotationDay(_ day: Int) async {
+        let context = modelContainer.mainContext
+        do {
+            var settings: AppSettings?
+            settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
+            if settings == nil {
+                settings = AppSettings()
+                context.insert(settings!)
+            }
+            settings?.eveningRotationDay = day
+            try context.save()
+            
+            AppGroupDefaults.shared.updateRotationDay(day)
+        }
+        catch {
+            print("Error handling rotation day: \(error)")
+        }
+    }
+    
     
     func sendFullSyncToWatch() async {
-        let context = modelContainer.mainContext
+        let cachedPayload = AppGroupDefaults.shared.loadAppContext()
+        WatchConnectivityManager.shared.sendFullSync(payload: cachedPayload)
         
-        do {
-            let progressionRecords = try context.fetch(FetchDescriptor<SkillProgressionRecord>())
-            let progressions       = progressionRecords.map { $0.toSkillProgression() }
-            
-            let settings     = try context.fetch(FetchDescriptor<AppSettings>()).first ?? AppSettings()
-            let workoutCount = try context.fetchCount(FetchDescriptor<WorkoutRecord>())
-            
-            let today       = Calendar.current.startOfDay(for: Date())
-            let scoreRecord = try context.fetch(
-                FetchDescriptor<RecoveryScoreRecord>(
-                    predicate: #Predicate { $0.date >= today },
-                    sortBy: [SortDescriptor(\RecoveryScoreRecord.date, order: .reverse)]
-                )
-            ).first
-            
-            let payload = WCSyncPayload(
-                skillProgressions:    progressions,
-                eveningRotationDay:   settings.eveningRotationDay,
-                targetSwingWeightKg:  settings.targetSwingWeightKg,
-                targetTGUWeightKg:    settings.targetTGUWeightKg,
-                recentWorkoutCount:   workoutCount,
-                todayRecoveryScore:   scoreRecord?.overallScore
-            )
-            
-            WatchConnectivityManager.shared.sendFullSync(payload: payload)
-        } catch {
-            print("sendFullSyncToWatch error: \(error)")
-        }
     }
 }

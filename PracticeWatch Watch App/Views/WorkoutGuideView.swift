@@ -82,16 +82,11 @@ private struct WorkoutPosition: Equatable {
 // MARK: - Main View
 
 struct WorkoutGuideView: View {
+    @Environment(ErrorState.self) var errorState
+    
     let plan: SessionPlan
     
-    @Environment(\.modelContext) private var modelContext
-    @Environment(ErrorState.self) private var errorState
-    @Query private var settingsResults: [AppSettings]
-    @Query private var progressionRecords: [SkillProgressionRecord]
-    @Query(sort: \KettlebellWeightRecord.date, order: .reverse)
-    private var kbRecords: [KettlebellWeightRecord]
-    
-    private var settings: AppSettings { settingsResults.first ?? AppSettings() }
+    @State private var settings = AppGroupDefaults.shared.loadAppContext()
     
     @State private var position = WorkoutPosition.start()
     @State private var completedExercises: [UUID: CompletedExercise] = [:]
@@ -111,8 +106,6 @@ struct WorkoutGuideView: View {
     @State private var nextTGUSide: TGUSide = .left
     // HR threshold — user can adjust on the rest screen
     @State private var hrThresholdOverride: Double? = nil
-    // Session notes — captured on the summary screen
-    @State private var sessionNotes: String = ""
     // Exercise timer for timed sets
     @State private var exerciseTimerSeconds: Int = 0
     @State private var exerciseTimerRunning: Bool = false
@@ -138,8 +131,12 @@ struct WorkoutGuideView: View {
         let isSwing = step.exercise.name.contains("Swing")
         let isTGUEx = step.exercise.name.contains("Get-Up")
         guard isSwing || isTGUEx else { return nil }
-        let typeRaw = isSwing ? KettlebellExerciseType.swing.rawValue : KettlebellExerciseType.tgu.rawValue
-        return kbRecords.first { $0.exerciseTypeRaw == typeRaw }?.weightKg
+        if isSwing {
+            return settings.lastSwingWeightKg
+        }
+        else {
+            return settings.lastTGUWeightKg
+        }
     }
     
     private var isTGU: Bool {
@@ -156,8 +153,7 @@ struct WorkoutGuideView: View {
                     completedExercises: Array(completedExercises.values),
                     activeCalories: sessionManager.activeCalories,
                     avgHeartRate: sessionManager.heartRate,
-                    elapsedSeconds: sessionManager.elapsedSeconds,
-                    sessionNotes: $sessionNotes
+                    elapsedSeconds: sessionManager.elapsedSeconds
                 )
             } else {
                 mainBody
@@ -733,51 +729,25 @@ struct WorkoutGuideView: View {
                 hkWorkoutUUID: hkUUID
             )
             
-            do {
-                let record = WorkoutRecord(from: workout)
-                modelContext.insert(record)
-                
-                // Explicitly insert children so SwiftData tracks them
-                for exRecord in record.exercises ?? [] {
-                    modelContext.insert(exRecord)
-                    for setRecord in exRecord.sets ?? [] {
-                        modelContext.insert(setRecord)
-                    }
-                }
-                
-                if plan.sessionType == .evening {
-                    settings.eveningRotationDay = (
-                        settings.eveningRotationDay + 1
-                    ) % Skill.activeSkills.count
-                }
-                
-                saveSkillEntries()
-                // Persist session notes if entered
-                if !sessionNotes.isEmpty {
-                    // Find the just-inserted record and update its notes
-                    let wid = workout.id
-                    if let wRecord = try? modelContext.fetch(
-                        FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.id == wid })
-                    ).first {
-                        wRecord.notes = sessionNotes
-                    }
-                }
-                
-                try modelContext.save()
-            } catch {
-                errorState.post("Failed to save workout: \(error.localizedDescription)")
+            if plan.sessionType == .evening {
+                settings.eveningRotationDay = (
+                    settings.eveningRotationDay + 1
+                ) % Skill.activeSkills.count
+                WatchConnectivityManager.shared
+                    .sendRotationDay(settings.eveningRotationDay)
             }
             
+            saveSkillEntries()
+           
             WatchConnectivityManager.shared.sendWorkout(workout)
             showSummary = true
         }
     }
     
     private func saveSkillEntries() {
-        let engine = ProgressionEngine()
         for step in plan.steps where step.exercise.category == .skillProgression {
             guard let ex = completedExercises[step.id], !ex.sets.isEmpty else { continue }
-            guard let progRecord = progressionRecords.first(where: {
+            guard let progRecord = settings.skillProgressions.first(where: {
                 $0.currentSkillLevel?.name == step.exercise.name
             }) else { continue }
             
@@ -786,22 +756,6 @@ struct WorkoutGuideView: View {
                 level: progRecord.currentLevel,
                 sets: ex.sets
             )
-            
-            // Insert session record and explicitly insert its SkillSetRecord children
-            let sessionRecord = SkillSessionRecord(from: entry)
-            modelContext.insert(sessionRecord)
-            for setRecord in sessionRecord.sets ?? [] {
-                modelContext.insert(setRecord)
-            }
-            
-            // Evaluate and apply progression
-            let progression = progRecord.toSkillProgression()
-            let recommendation = engine.evaluate(progression: progression, history: [entry])
-            let updated = engine.apply(recommendation: recommendation, to: progression)
-            
-            // Persist the updated levels (dateAchieved may have been stamped)
-            progRecord.currentLevel = updated.currentLevel
-            progRecord.levels = updated.levels
             
             WatchConnectivityManager.shared.sendSkillEntry(entry)
         }

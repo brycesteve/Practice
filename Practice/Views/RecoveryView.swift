@@ -311,7 +311,7 @@ struct RecoveryView: View {
         
         // If we have a cached score from today that is less than 3 hours old, use it
         let cacheIsFresh = todayRecord.map {
-            Date().timeIntervalSince($0.date) < 3 * 3600
+            Date().timeIntervalSince($0.date) < 2 * 3600
         } ?? false
         
         if !cacheIsFresh {

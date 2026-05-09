@@ -8,7 +8,7 @@
 
 import Foundation
 import WatchConnectivity
-import SwiftData
+
 import WidgetKit
 
 // MARK: - Message keys
@@ -25,6 +25,8 @@ public enum WCMessageKey {
     // Phone → Watch
     public static let fullSync          = "fullSync"            // Data (JSON-encoded WCSyncPayload)
     public static let settingsUpdate    = "settingsUpdate"      // Data
+    
+    public static let updateRotationDay = "updateRotationDay" //Int
 }
 
 /// Everything the watch needs to know about the current training state
@@ -33,60 +35,45 @@ public struct WCSyncPayload: Codable, Sendable {
     public var eveningRotationDay: Int
     public var targetSwingWeightKg: Double
     public var targetTGUWeightKg: Double
-    public var recentWorkoutCount: Int
-    public var todayRecoveryScore: Double?
+    public var lastSwingWeightKg: Double
+    public var lastTGUWeightKg: Double
+    public var recoveryData: RecoveryDataDTO?
+    public var restDays: [Date]
+    
+    
     
     public init(
-        skillProgressions: [SkillProgression],
-        eveningRotationDay: Int,
-        targetSwingWeightKg: Double,
-        targetTGUWeightKg: Double,
-        recentWorkoutCount: Int,
-        todayRecoveryScore: Double? = nil
+        skillProgressions: [SkillProgression] = [],
+        eveningRotationDay: Int = 0,
+        targetSwingWeightKg: Double = 24,
+        targetTGUWeightKg: Double = 24,
+        lastSwingWeightKg: Double = 24,
+        lastTGUWeightKg: Double = 24,
+        recoveryData: RecoveryDataDTO? = nil,
+        restDays: [Date] = []
     ) {
         self.skillProgressions = skillProgressions
         self.eveningRotationDay = eveningRotationDay
         self.targetSwingWeightKg = targetSwingWeightKg
         self.targetTGUWeightKg = targetTGUWeightKg
-        self.recentWorkoutCount = recentWorkoutCount
-        self.todayRecoveryScore = todayRecoveryScore
+        self.lastSwingWeightKg = lastSwingWeightKg
+        self.lastTGUWeightKg = lastTGUWeightKg
+        self.recoveryData = recoveryData
+        self.restDays = restDays
+    }
+    
+    public mutating func updateRestDays(_ days: [Date]) {
+        self.restDays = days.sorted(by: { a, b in
+            a < b
+        }).suffix(5)
+    }
+    
+    public mutating func addSkillProgression(_ progression: SkillProgression) {
+        self.skillProgressions.append(progression)
     }
 }
 
-// MARK: - Sendable transfer type for kettlebell entries
-// KettlebellWeightRecord is a SwiftData @Model and therefore not Sendable.
-// We pass this value type across actor boundaries instead, and construct
-// the @Model object only once safely on the main actor in the delegate.
 
-public struct KettlebellEntryTransfer: Sendable {
-    public let id: UUID
-    public let date: Date
-    public let exerciseType: KettlebellExerciseType
-    public let weightKg: Double
-    public let sets: Int
-    public let reps: Int
-    
-    public init(id: UUID = UUID(), date: Date = .now,
-                exerciseType: KettlebellExerciseType,
-                weightKg: Double, sets: Int, reps: Int) {
-        self.id          = id
-        self.date        = date
-        self.exerciseType = exerciseType
-        self.weightKg    = weightKg
-        self.sets        = sets
-        self.reps        = reps
-    }
-    
-    /// Construct the SwiftData model — call only on the main actor.
-    @MainActor
-    func toRecord() -> KettlebellWeightRecord {
-        KettlebellWeightRecord(
-            id: id, date: date,
-            exerciseType: exerciseType,
-            weightKg: weightKg, sets: sets, reps: reps
-        )
-    }
-}
 
 // MARK: - Delegate protocol (implemented separately on iOS and watchOS)
 
@@ -99,6 +86,7 @@ public protocol WatchConnectivityDelegate: AnyObject, Sendable {
     func didReceiveKettlebellEntry(_ entry: KettlebellEntryTransfer) async
     /// Watch received a full sync payload from the phone
     func didReceiveSyncPayload(_ payload: WCSyncPayload) async
+    
 }
 
 // MARK: - Manager
@@ -115,6 +103,7 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
     
     private let session: WCSession? = WCSession.isSupported() ? WCSession.default : nil
     
+   
     // MARK: - Activation
     
     public func activate() {
@@ -122,6 +111,7 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
         session.delegate = self
         session.activate()
     }
+    
     
     // MARK: - Watch → Phone: send completed workout
     
@@ -133,6 +123,10 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
     public func sendSkillEntry(_ entry: SkillSessionEntry) {
         guard let data = try? JSONEncoder().encode(entry) else { return }
         send(message: [WCMessageKey.skillEntry: data])
+    }
+    
+    public func sendRotationDay(_ newDay: Int) {
+        send(message: [WCMessageKey.updateRotationDay: newDay])
     }
     
     public func sendKettlebellEntry(exerciseType: KettlebellExerciseType, weightKg: Double, sets: Int, reps: Int) {
@@ -166,6 +160,7 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
         // Also try real-time if reachable
         send(message: [WCMessageKey.fullSync: data])
     }
+    
     
     // MARK: - Internal send helpers
     
@@ -220,12 +215,14 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
             }
             
             if let data = message[WCMessageKey.fullSync] as? Data,
-               let payload = try? JSONDecoder().decode(WCSyncPayload.self, from: data) {
+                let payload = try? JSONDecoder().decode(WCSyncPayload.self, from: data) {
                 await delegate?.didReceiveSyncPayload(payload)
+                
+                AppGroupDefaults.shared.saveAppContext(payload)
                 
                 // Post notification so WatchRecoveryView updates reactively
                 // without needing to be the delegate itself
-                if let score = payload.todayRecoveryScore {
+                if let score = payload.recoveryData?.overallScore {
                     await MainActor.run {
                         NotificationCenter.default.post(
                             name: .recoveryScoreReceived,
@@ -249,6 +246,16 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
                     object: nil,
                     userInfo: ["isRestDay": isRestDay]
                 )
+            }
+            
+            if let rotationDay = message[WCMessageKey.updateRotationDay] as? Int {
+                AppGroupDefaults.shared.updateRotationDay(rotationDay)
+                NotificationCenter.default
+                    .post(
+                        name:.rotationDayReceived,
+                        object: nil,
+                        userInfo: ["rotationDay": rotationDay]
+                    )
             }
         }
     }
@@ -303,4 +310,5 @@ public extension Notification.Name {
     static let syncPayloadReceived   = Notification.Name("syncPayloadReceived")
     static let recoveryScoreReceived = Notification.Name("recoveryScoreReceived")
     static let restDayReceived       = Notification.Name("restDayReceived")
+    static let rotationDayReceived = Notification.Name("rotationDayReceived")
 }

@@ -8,9 +8,8 @@ struct WorkoutSummaryView: View {
     let activeCalories: Double
     let avgHeartRate: Double
     let elapsedSeconds: Int
-    @Binding var sessionNotes: String
     
-    @Environment(\.modelContext) private var modelContext
+    
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -42,15 +41,6 @@ struct WorkoutSummaryView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Notes").font(.caption2).foregroundStyle(.secondary)
-                    TextField("Session notes…", text: $sessionNotes, axis: .vertical)
-                        .font(.caption)
-                        .textFieldStyle(.automatic)
-                        .lineLimit(3, reservesSpace: true)
-                        .onChange(of: sessionNotes) { _, _ in saveNotes() }
-                }
-                .padding(.top, 4)
                 
                 Button("Back to Home") {
                     dismiss()

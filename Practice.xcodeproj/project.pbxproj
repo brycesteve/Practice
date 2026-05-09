@@ -110,10 +110,9 @@
 		AA5389E62DE20B07008CA062 /* Exceptions for "Shared" folder in "PracticeWatch Watch App" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Data/AppGroupDefaults.swift,
 				Data/Exercises.swift,
-				Data/Models.swift,
-				Data/Schema.swift,
-				Data/Schemas/TrainingSchemaV1.swift,
+				Data/SharedModels.swift,
 				Data/SkillProgressions.swift,
 				Data/Skills.swift,
 				Data/WorkoutData.swift,
@@ -140,10 +139,9 @@
 		AA5EAEF62E43F3DD00A2743F /* Exceptions for "Shared" folder in "PracticeWatchWidgetExtensionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Data/AppGroupDefaults.swift,
 				Data/Exercises.swift,
-				Data/Models.swift,
-				Data/Schema.swift,
-				Data/Schemas/TrainingSchemaV1.swift,
+				Data/SharedModels.swift,
 				Data/SkillProgressions.swift,
 				Data/Skills.swift,
 				Data/WorkoutData.swift,
@@ -167,10 +165,9 @@
 		AA5EAF122E4919E500A2743F /* Exceptions for "Shared" folder in "PracticeWidgetExtensionExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Data/AppGroupDefaults.swift,
 				Data/Exercises.swift,
-				Data/Models.swift,
-				Data/Schema.swift,
-				Data/Schemas/TrainingSchemaV1.swift,
+				Data/SharedModels.swift,
 				Data/SkillProgressions.swift,
 				Data/Skills.swift,
 				Data/WorkoutData.swift,

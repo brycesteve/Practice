@@ -310,6 +310,50 @@ public struct AdvanceCriteria: Codable, Sendable {
     }
 }
 
+public struct RecoveryDataDTO: Codable, Sendable {
+    public var overallScore: Double = 0
+    public var hrvScore: Double? = nil
+    public var restingHRScore: Double? = nil
+    public var sleepDurationScore: Double? = nil
+    public var sleepQualityScore: Double? = nil
+    public var respiratoryRateScore: Double? = nil
+    public var trainingLoadScore: Double? = nil
+    public var hrv: Double? = nil
+    public var restingHR: Double? = nil
+    public var sleepHours: Double? = nil
+    public var respiratoryRate: Double? = nil
+    public var activeEnergyYesterday: Double? = nil
+    
+    
+}
+
+// MARK: - Sendable transfer type for kettlebell entries
+// KettlebellWeightRecord is a SwiftData @Model and therefore not Sendable.
+// We pass this value type across actor boundaries instead, and construct
+// the @Model object only once safely on the main actor in the delegate.
+
+public struct KettlebellEntryTransfer: Sendable {
+    public let id: UUID
+    public let date: Date
+    public let exerciseType: KettlebellExerciseType
+    public let weightKg: Double
+    public let sets: Int
+    public let reps: Int
+    
+    public init(id: UUID = UUID(), date: Date = .now,
+                exerciseType: KettlebellExerciseType,
+                weightKg: Double, sets: Int, reps: Int) {
+        self.id          = id
+        self.date        = date
+        self.exerciseType = exerciseType
+        self.weightKg    = weightKg
+        self.sets        = sets
+        self.reps        = reps
+    }
+    
+    
+}
+
 public struct SkillProgression: Identifiable, Codable, Sendable {
     public let id: UUID
     public var skillName: String   // e.g. "Planche", "Handstand", "Ring Skills"

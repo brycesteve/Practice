@@ -3,7 +3,6 @@
 // WatchConnectivity handles the real-time sync bridge with iOS.
 
 import SwiftUI
-import SwiftData
 
 @main
 struct TrainingWatchApp: App {
@@ -31,9 +30,6 @@ struct TrainingWatchApp: App {
                 try? await HealthKitManager.shared.requestAuthorization()
             }
         }
-        .modelContainer(try! ModelContainer.makeWatch())
         .environment(errorState)
-        
-        
     }
 }
