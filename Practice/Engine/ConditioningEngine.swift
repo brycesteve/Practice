@@ -21,7 +21,7 @@ public actor ConditioningEngine {
 
     // MARK: - Main entry point
 
-    public func computeScore(
+    func computeScore(
         workoutRecords: [WorkoutRecord],
         kbRecords: [KettlebellWeightRecord],
         bodyMassKg: Double?,
@@ -36,7 +36,7 @@ public actor ConditioningEngine {
                                            unit: HKUnit.secondUnit(with: .milli), days: 56)
         async let vo2Slope    = fetchVO2Slope(days: 90)
 
-        let (hrr, rhr, hrv, vo2) = try await (hrRecovery, rhrSlope, hrvSlope, vo2Slope)
+        let (hrr, rhr, hrv, vo2) = await (hrRecovery, rhrSlope, hrvSlope, vo2Slope)
 
         // KB strength-to-weight ratio
         let kbRatio: Double?

@@ -102,7 +102,26 @@ public actor RecoveryEngine {
     /// Fetch all relevant HealthKit metrics and compute today's readiness score.
     public func computeScore() async throws -> RecoveryScore {
         let metrics = try await fetchMetrics()
-        return score(from: metrics)
+        
+        // Fetch personal baselines in parallel with the metric fetch.
+        // Each returns nil if fewer than 14 days of history exist,
+        // in which case score(from:baselines:) falls back to population norms.
+        async let hrvBaseline   = fetchBaseline(.heartRateVariabilitySDNN,
+                                                unit: HKUnit.secondUnit(with: .milli))
+        async let rhrBaseline   = fetchBaseline(.restingHeartRate,
+                                                unit: .count().unitDivided(by: .minute()))
+        async let respBaseline  = fetchBaseline(.respiratoryRate,
+                                                unit: .count().unitDivided(by: .minute()))
+        async let sleepBaseline = fetchSleepBaseline()
+        
+        let baselines = MetricBaselines(
+            hrv:            await hrvBaseline,
+            restingHR:      await rhrBaseline,
+            sleepHours:     await sleepBaseline,
+            respiratoryRate: await respBaseline
+        )
+        
+        return score(from: metrics, baselines: baselines)
     }
     
     // MARK: - Fetch metrics
@@ -128,106 +147,331 @@ public actor RecoveryEngine {
         )
     }
     
+    // MARK: - Personal baseline
+    
+    private struct Baseline {
+        let mean: Double
+        let stdDev: Double
+        /// Score today's value as a z-score mapped to 0–100.
+        /// +2 std devs above mean = 100, -2 below = 0, mean = 50.
+        /// higherIsBetter: true for HRV, false for resting HR.
+        func score(_ value: Double, higherIsBetter: Bool) -> Double {
+            guard stdDev > 0 else { return 50 }
+            let z = (value - mean) / stdDev
+            let directed = higherIsBetter ? z : -z
+            return min(max((directed + 2) / 4 * 100, 0), 100)
+        }
+    }
+    
+    /// Fetch up to `days` days of samples and return personal baseline stats.
+    /// Returns nil if fewer than `minSamples` exist — caller falls back to population norm.
+    private func fetchBaseline(
+        _ identifier: HKQuantityTypeIdentifier,
+        unit: HKUnit,
+        days: Int = 60,
+        minSamples: Int = 14
+    ) async -> Baseline? {
+        let type  = HKQuantityType(identifier)
+        let start = Calendar.current.date(byAdding: .day, value: -days, to: Date())!
+        // Exclude today so baseline isn't contaminated by today's reading
+        let end   = Calendar.current.startOfDay(for: Date())
+        let pred  = HKQuery.predicateForSamples(withStart: start, end: end)
+        
+        let values: [Double] = await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type, predicate: pred,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, samples, _ in
+                let v = (samples as? [HKQuantitySample] ?? [])
+                    .map { $0.quantity.doubleValue(for: unit) }
+                continuation.resume(returning: v)
+            }
+            store.execute(query)
+        }
+        
+        guard values.count >= minSamples else { return nil }
+        
+        let mean   = values.reduce(0, +) / Double(values.count)
+        let stdDev = sqrt(values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count))
+        return Baseline(mean: mean, stdDev: stdDev)
+    }
+    
+    /// Fetch baseline for sleep hours — derived from category samples, not quantity.
+    private func fetchSleepBaseline(days: Int = 60, minSamples: Int = 14) async -> Baseline? {
+        let sleepType = HKCategoryType(.sleepAnalysis)
+        let start = Calendar.current.date(byAdding: .day, value: -days, to: Date())!
+        let end   = Calendar.current.startOfDay(for: Date())
+        let pred  = HKQuery.predicateForSamples(withStart: start, end: end)
+        
+        let asleepValues: Set<Int> = [
+            HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue,
+            HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+            HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
+            HKCategoryValueSleepAnalysis.asleepREM.rawValue,
+        ]
+        
+        func mergeIntervals(_ intervals: [(Date, Date)]) -> [(Date, Date)] {
+            let sorted = intervals.sorted { $0.0 < $1.0 }
+            var result: [(Date, Date)] = []
+            
+            for interval in sorted {
+                if let last = result.last, interval.0 <= last.1 {
+                    result[result.count - 1].1 = max(last.1, interval.1)
+                } else {
+                    result.append(interval)
+                }
+            }
+            
+            return result
+        }
+        
+        // Group samples by night and sum hours per night
+        let dailyHours: [Double] = await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sleepType, predicate: pred,
+                limit: HKObjectQueryNoLimit, sortDescriptors: nil
+            ) {
+                _, samples, _ in
+                var samplesByDay: [String: [HKCategorySample]] = [:]
+                
+                let asleepSamples = (samples as? [HKCategorySample] ?? [])
+                    .filter { asleepValues.contains($0.value) }
+                    .sorted { $0.startDate > $1.startDate }
+                let fmt = DateFormatter()
+                fmt.dateFormat = "yyyy-MM-dd"
+                for sample in asleepSamples {
+                    let key = fmt.string(from: sample.startDate)
+                    if samplesByDay[key] == nil {
+                        samplesByDay[key] = [sample]
+                        continue
+                    }
+                    
+                    let last = samplesByDay[key]!.last!
+                    
+                    // Allow small gaps (5 min) to keep session contiguous
+                    if sample.endDate >= last.startDate.addingTimeInterval(-300) {
+                        samplesByDay[key]!.append(sample)
+                    } else {
+                        break
+                    }
+                }
+                
+                var byDay: [String: Double] = [:]
+                for (date, data) in samplesByDay {
+                    let mergedSleep = mergeIntervals(
+                        data.map{ ($0.startDate, $0.endDate) }
+                    )
+                    
+                    let totalSleep = mergedSleep
+                        .map { $0.1.timeIntervalSince($0.0) }
+                        .reduce(0, +)
+                    
+                    byDay[date] = totalSleep
+                }
+                
+                continuation.resume(returning: Array(byDay.values))
+            }
+            store.execute(query)
+        }
+        
+        guard dailyHours.count >= minSamples else { return nil }
+        let mean   = dailyHours.reduce(0, +) / Double(dailyHours.count)
+        let stdDev = sqrt(dailyHours.map { pow($0 - mean, 2) }.reduce(0, +) / Double(dailyHours.count))
+        return Baseline(mean: mean, stdDev: stdDev)
+    }
+    
+    
     // MARK: - Score calculation
     
-    private func score(from m: RecoveryMetrics) -> RecoveryScore {
+    private func score(from m: RecoveryMetrics, baselines: MetricBaselines) -> RecoveryScore {
         var components: [(score: Double, weight: Double)] = []
         
-        // HRV (30%) — score using population norms: <20ms poor, 20–50ms average, >80ms excellent
         var hrvC: Double? = nil
         if let hrv = m.hrv {
-            let s = clamp(normalize(hrv, low: 15, mid: 40, high: 80), 0, 100)
-            hrvC = s
-            components.append((s, 0.30))
+            let s = baselines.hrv.map { $0.score(hrv, higherIsBetter: true) }
+            ?? clamp(normalize(hrv, low: 15, mid: 40, high: 80), 0, 100)
+            hrvC = s; components.append((s, 0.30))
         }
         
-        // Resting HR (20%) — lower is better; <50 excellent, 50–70 normal, >85 poor
         var rhrC: Double? = nil
         if let rhr = m.restingHeartRate {
-            let s = clamp(normalize(100 - rhr, low: 15, mid: 30, high: 50), 0, 100)
-            rhrC = s
-            components.append((s, 0.20))
+            let s = baselines.restingHR.map { $0.score(rhr, higherIsBetter: false) }
+            ?? clamp(normalize(100 - rhr, low: 15, mid: 30, high: 50), 0, 100)
+            rhrC = s; components.append((s, 0.20))
         }
         
-        // Sleep Duration (20%) — target 7.5–9h; <5h or >10h penalised
         var sleepDurC: Double? = nil
         if let hours = m.sleepDuration {
             let s: Double
-            switch hours {
-            case 0..<4:    s = 5
-            case 4..<5.5:  s = 30
-            case 5.5..<6.5:s = 55
-            case 6.5..<7:  s = 72
-            case 7..<9.5:  s = 100
-            case 9.5..<11: s = 80
-            default:       s = 60
+            if let b = baselines.sleepHours {
+                s = b.score(hours, higherIsBetter: true)
+            } else {
+                switch hours {
+                case 0..<4:     s = 5
+                case 4..<5.5:   s = 30
+                case 5.5..<6.5: s = 55
+                case 6.5..<7:   s = 72
+                case 7..<9.5:   s = 100
+                case 9.5..<11:  s = 80
+                default:        s = 60
+                }
             }
-            sleepDurC = s
-            components.append((s, 0.20))
+            sleepDurC = s; components.append((s, 0.20))
         }
         
-        // Sleep Quality (15%) — % time in deep + REM
         var sleepQC: Double? = nil
         if let quality = m.sleepQualityPercent {
-            // 40%+ is excellent, <15% is poor
             let s = clamp(normalize(quality, low: 10, mid: 25, high: 40), 0, 100)
-            sleepQC = s
-            components.append((s, 0.15))
+            sleepQC = s; components.append((s, 0.15))
         }
         
-        // Respiratory Rate (5%) — normal ~12–20; elevated = stress
         var respC: Double? = nil
         if let resp = m.respiratoryRate {
-            let s: Double
-            switch resp {
-            case 0..<12:   s = 70   // low is unusual but not necessarily bad
-            case 12..<16:  s = 100
-            case 16..<18:  s = 85
-            case 18..<20:  s = 65
-            default:       s = 35   // elevated
-            }
-            respC = s
-            components.append((s, 0.05))
+            let s = baselines.respiratoryRate.map { $0.score(resp, higherIsBetter: false) }
+            ?? { switch resp {
+            case 0..<12:  return 70.0
+            case 12..<16: return 100.0
+            case 16..<18: return 85.0
+            case 18..<20: return 65.0
+            default:      return 35.0
+            } }()
+            respC = s; components.append((s, 0.05))
         }
         
-        // Training Load (10%) — recent heavy energy spend = less recovery capacity
         var loadC: Double? = nil
         let totalLoad = (m.activeEnergyYesterday ?? 0) + (m.activeEnergyTwoDaysAgo ?? 0) * 0.5
         if m.activeEnergyYesterday != nil || m.activeEnergyTwoDaysAgo != nil {
-            // <300kcal combined = fully rested, >1200kcal = heavy load
             let s = clamp(100 - normalize(totalLoad, low: 200, mid: 700, high: 1200), 0, 100)
-            loadC = s
-            components.append((s, 0.10))
+            loadC = s; components.append((s, 0.10))
         }
         
-        // Weighted average, re-normalised if some metrics missing
         let totalWeight = components.map(\.weight).reduce(0, +)
-        let weighted: Double
-        if totalWeight == 0 {
-            weighted = 50   // no data: neutral score
-        } else {
-            weighted = components.map { $0.score * ($0.weight / totalWeight) }.reduce(0, +)
-        }
+        let weighted    = totalWeight == 0 ? 50.0 :
+        components.map { $0.score * ($0.weight / totalWeight) }.reduce(0, +)
         
         let quality: RecoveryScore.DataQuality
         switch components.count {
-        case 4...: quality = .rich
+        case 4...:  quality = .rich
         case 2...3: quality = .moderate
-        default: quality = .limited
+        default:    quality = .limited
         }
         
         return RecoveryScore(
             overall: weighted.rounded(),
-            hrvContribution: hrvC,
-            restingHRContribution: rhrC,
-            sleepDurationContribution: sleepDurC,
-            sleepQualityContribution: sleepQC,
-            respiratoryContribution: respC,
-            trainingLoadContribution: loadC,
-            metrics: m,
-            dataQuality: quality
+            hrvContribution: hrvC, restingHRContribution: rhrC,
+            sleepDurationContribution: sleepDurC, sleepQualityContribution: sleepQC,
+            respiratoryContribution: respC, trainingLoadContribution: loadC,
+            metrics: m, dataQuality: quality
         )
     }
+    
+    // Container for all personal baselines fetched in one pass
+    private struct MetricBaselines {
+        var hrv: Baseline?
+        var restingHR: Baseline?
+        var sleepHours: Baseline?
+        var respiratoryRate: Baseline?
+    }
+    
+//    private func score(from m: RecoveryMetrics) -> RecoveryScore {
+//        var components: [(score: Double, weight: Double)] = []
+//        
+//        // HRV (30%) — score using population norms: <20ms poor, 20–50ms average, >80ms excellent
+//        var hrvC: Double? = nil
+//        if let hrv = m.hrv {
+//            let s = clamp(normalize(hrv, low: 15, mid: 40, high: 80), 0, 100)
+//            hrvC = s
+//            components.append((s, 0.30))
+//        }
+//        
+//        // Resting HR (20%) — lower is better; <50 excellent, 50–70 normal, >85 poor
+//        var rhrC: Double? = nil
+//        if let rhr = m.restingHeartRate {
+//            let s = clamp(normalize(100 - rhr, low: 15, mid: 30, high: 50), 0, 100)
+//            rhrC = s
+//            components.append((s, 0.20))
+//        }
+//        
+//        // Sleep Duration (20%) — target 7.5–9h; <5h or >10h penalised
+//        var sleepDurC: Double? = nil
+//        if let hours = m.sleepDuration {
+//            let s: Double
+//            switch hours {
+//            case 0..<4:    s = 5
+//            case 4..<5.5:  s = 30
+//            case 5.5..<6.5:s = 55
+//            case 6.5..<7:  s = 72
+//            case 7..<9.5:  s = 100
+//            case 9.5..<11: s = 80
+//            default:       s = 60
+//            }
+//            sleepDurC = s
+//            components.append((s, 0.20))
+//        }
+//        
+//        // Sleep Quality (15%) — % time in deep + REM
+//        var sleepQC: Double? = nil
+//        if let quality = m.sleepQualityPercent {
+//            // 40%+ is excellent, <15% is poor
+//            let s = clamp(normalize(quality, low: 10, mid: 25, high: 40), 0, 100)
+//            sleepQC = s
+//            components.append((s, 0.15))
+//        }
+//        
+//        // Respiratory Rate (5%) — normal ~12–20; elevated = stress
+//        var respC: Double? = nil
+//        if let resp = m.respiratoryRate {
+//            let s: Double
+//            switch resp {
+//            case 0..<12:   s = 70   // low is unusual but not necessarily bad
+//            case 12..<16:  s = 100
+//            case 16..<18:  s = 85
+//            case 18..<20:  s = 65
+//            default:       s = 35   // elevated
+//            }
+//            respC = s
+//            components.append((s, 0.05))
+//        }
+//        
+//        // Training Load (10%) — recent heavy energy spend = less recovery capacity
+//        var loadC: Double? = nil
+//        let totalLoad = (m.activeEnergyYesterday ?? 0) + (m.activeEnergyTwoDaysAgo ?? 0) * 0.5
+//        if m.activeEnergyYesterday != nil || m.activeEnergyTwoDaysAgo != nil {
+//            // <300kcal combined = fully rested, >1200kcal = heavy load
+//            let s = clamp(100 - normalize(totalLoad, low: 200, mid: 700, high: 1200), 0, 100)
+//            loadC = s
+//            components.append((s, 0.10))
+//        }
+//        
+//        // Weighted average, re-normalised if some metrics missing
+//        let totalWeight = components.map(\.weight).reduce(0, +)
+//        let weighted: Double
+//        if totalWeight == 0 {
+//            weighted = 50   // no data: neutral score
+//        } else {
+//            weighted = components.map { $0.score * ($0.weight / totalWeight) }.reduce(0, +)
+//        }
+//        
+//        let quality: RecoveryScore.DataQuality
+//        switch components.count {
+//        case 4...: quality = .rich
+//        case 2...3: quality = .moderate
+//        default: quality = .limited
+//        }
+//        
+//        return RecoveryScore(
+//            overall: weighted.rounded(),
+//            hrvContribution: hrvC,
+//            restingHRContribution: rhrC,
+//            sleepDurationContribution: sleepDurC,
+//            sleepQualityContribution: sleepQC,
+//            respiratoryContribution: respC,
+//            trainingLoadContribution: loadC,
+//            metrics: m,
+//            dataQuality: quality
+//        )
+//    }
     
     // MARK: - HealthKit queries
     
@@ -326,7 +570,7 @@ public actor RecoveryEngine {
                     let last = session.last!
                     
                     // Allow small gaps (5 min) to keep session contiguous
-                    if sample.endDate >= last.startDate.addingTimeInterval(-1800) {
+                    if sample.endDate >= last.startDate.addingTimeInterval(-300) {
                         session.append(sample)
                     } else {
                         break

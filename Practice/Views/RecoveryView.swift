@@ -15,7 +15,7 @@ struct RecoveryView: View {
     @State private var scoreHistory: [RecoveryScoreRecord] = []
     
     var body: some View {
-        NavigationStack {
+        //NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
@@ -36,7 +36,7 @@ struct RecoveryView: View {
             .navigationBarTitleDisplayMode(.large)
             .task { await loadScore() }
             .refreshable { await loadScore() }
-        }
+        //}
     }
     
     // MARK: - Loading
@@ -251,8 +251,10 @@ struct RecoveryView: View {
                 ForEach(recent) { record in
                     AreaMark(
                         x: .value("Date", record.date, unit: .day),
-                        y: .value("Score", record.overallScore)
+                        yStart: .value("Min", 0),
+                        yEnd: .value("Score", record.overallScore)
                     )
+                    
                     .foregroundStyle(
                         LinearGradient(
                             colors: [scoreColor(recent.last?.overallScore ?? 70).opacity(0.3), .clear],
@@ -264,7 +266,9 @@ struct RecoveryView: View {
                         x: .value("Date", record.date, unit: .day),
                         y: .value("Score", record.overallScore)
                     )
+                    
                     .foregroundStyle(scoreColor(recent.last?.overallScore ?? 70))
+                    .interpolationMethod(.monotone)
                     .symbol(.circle)
                     .symbolSize(30)
                 }

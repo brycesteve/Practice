@@ -28,7 +28,7 @@ struct BodyStatsView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        //NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
@@ -45,7 +45,7 @@ struct BodyStatsView: View {
             .navigationBarTitleDisplayMode(.large)
             .task { await loadData() }
             .refreshable { await loadData() }
-        }
+        //}
     }
 
     // MARK: - Weight section

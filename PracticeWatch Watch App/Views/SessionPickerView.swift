@@ -1,11 +1,10 @@
-// SessionPickerView.swift — watchOS
+// SessionPickerView.swift — watchOS (Refined UI Design)
 
 import SwiftUI
 import SwiftData
 
 struct SessionPickerView: View {
     @Environment(ErrorState.self) private var errorState
-    
     @State private var settings = AppGroupDefaults.shared.loadAppContext()
     
     private var isRestDayToday: Bool {
@@ -20,89 +19,157 @@ struct SessionPickerView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                ForEach(SessionType.allCases, id: \.self) { type in
-                    NavigationLink(value: type) {
-                        Label(type.displayName,
-                              systemImage: type == .morning ? "sun.max.fill" : "moon.stars.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(
-                            type == .morning
-                            ? Color.orange.opacity(0.3)
-                            : Color.indigo.opacity(0.3)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 12) {
+                    
+                    // MARK: - Session Tiles
+                    ForEach(SessionType.allCases, id: \ .self) { type in
+                        NavigationLink(value: type) {
+                            sessionTile(for: type)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    
+                    // MARK: - Secondary Actions
+                    VStack(spacing: 10) {
+                        
+                        Button {
+                            toggleRestDay()
+                        } label: {
+                            HStack {
+                                Image(systemName: isRestDayToday ? "bed.double.fill" : "bed.double")
+                                Text(isRestDayToday ? "Rest Day Active" : "Mark Rest Day")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(SecondaryTileStyle(isActive: isRestDayToday))
+                        
+                        NavigationLink(destination: WatchRecoveryView()) {
+                            HStack {
+                                Image(systemName: "heart.text.square.fill")
+                                Text("Recovery")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .buttonStyle(SecondaryTileStyle(isActive: false))
+                    }
+                    .padding(.top, 4)
+                    
+                    Spacer(minLength: 8)
+                    
+                    Text(rotationLabel)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                
-                // Rest day toggle
-                Button {
-                    toggleRestDay()
-                } label: {
-                    Label(
-                        isRestDayToday ? "Rest Day ✓" : "Mark Rest Day",
-                        systemImage: isRestDayToday ? "bed.double.fill" : "bed.double"
-                    )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(isRestDayToday ? Color.gray.opacity(0.35) : Color.gray.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                
-                NavigationLink(destination: WatchRecoveryView()) {
-                    Label("Recovery", systemImage: "heart.text.square.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.red.opacity(0.2))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                
-                Spacer()
-                
-                Text(rotationLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
+            .navigationTitle("Practice")
             .navigationDestination(for: SessionType.self) { type in
                 WorkoutGuideView(plan: plan(for: type))
             }
             .onAppear {
-                
                 requestSyncIfNeeded()
             }
-            .navigationTitle("Practice")
         }
     }
     
-    // MARK: - Rest day
+    // MARK: - Session Tile
+    
+    @ViewBuilder
+    private func sessionTile(for type: SessionType) -> some View {
+        let config = sessionConfig(for: type)
+        
+        HStack(spacing: 12) {
+            Image(systemName: config.icon)
+                .font(.title2)
+                .foregroundStyle(config.tint)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(type.displayName)
+                    .font(.caption).fontWeight(.semibold)
+                Text(config.subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            
+        }
+        
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(config.tint.opacity(0.22))
+            
+        )
+    }
+    
+    private func sessionConfig(for type: SessionType) -> (icon: String, tint: Color, subtitle: String) {
+        switch type {
+        case .morning:
+            return ("sunrise.fill", .yellow, "Strength & conditioning")
+        case .evening:
+            return ("moon.stars", .indigo, "Skill & mobility")
+        }
+    }
+    
+    // MARK: - Secondary Tile Style
+    
+    struct SecondaryTileStyle: ButtonStyle {
+        let isActive: Bool
+        
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .font(.caption)
+                .padding(.vertical, 10)
+                .padding(.horizontal, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(isActive ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.12))
+                )
+                .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+                .opacity(configuration.isPressed ? 0.85 : 1.0)
+        }
+    }
+    
+    // MARK: - Rest Day
     
     private func toggleRestDay() {
         let isCurrentlyRest = isRestDayToday
         
         var newRestDays = settings.restDays
         if isCurrentlyRest {
-            newRestDays = settings.restDays.filter { !Calendar.current.isDateInToday($0)}
+            newRestDays = settings.restDays.filter { !Calendar.current.isDateInToday($0) }
         } else {
             newRestDays.append(Date())
         }
-    
+        
         AppGroupDefaults.shared.updateRestDays(newRestDays)
         settings = AppGroupDefaults.shared.loadAppContext()
-        // Sync rest day state to iOS so its consistency score stays accurate
+        
         WatchConnectivityManager.shared.sendRestDay(isRestDay: !isCurrentlyRest)
     }
     
-    // MARK: - Session plan
+    // MARK: - Session Plan
     
     private func plan(for type: SessionType) -> SessionPlan {
         let valueProgressions = settings.skillProgressions
+        
         switch type {
         case .morning:
-            return SessionPlan(sessionType: .morning, steps: WorkoutData.morningSteps, estimatedDurationMinutes: 60)
+            return SessionPlan(
+                sessionType: .morning,
+                steps: WorkoutData.morningSteps,
+                estimatedDurationMinutes: 60
+            )
         case .evening:
             return SessionPlan(
                 sessionType: .evening,
@@ -115,19 +182,14 @@ struct SessionPickerView: View {
         }
     }
     
-    // MARK: - First-launch setup
+    // MARK: - Sync
     
-    private func ensureDefaultProgressions() {
-        let existingNames = Set(settings.skillProgressions.map { $0.skillName })
-        for def in SkillProgressions.defaultSkillProgressions where !existingNames.contains(def.skillName) {
-            settings.addSkillProgression(def)
-        }
-        settings = AppGroupDefaults.shared.loadAppContext()
-    }
-    
-    /// Silently request a full sync from iOS on first launch (no settings yet)
-    /// so the watch has current progressions, rotation day, and recovery score.
     private func requestSyncIfNeeded() {
         WatchConnectivityManager.shared.requestFullSync()
     }
+}
+
+#Preview {
+    SessionPickerView()
+        .environment(ErrorState())
 }

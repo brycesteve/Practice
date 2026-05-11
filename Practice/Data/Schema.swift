@@ -40,6 +40,7 @@ typealias KettlebellWeightRecord = CurrentSchema.KettlebellWeightRecord
 typealias AppSettings = CurrentSchema.AppSettings
 typealias RecoveryScoreRecord = CurrentSchema.RecoveryScoreRecord
 typealias RestDayRecord = CurrentSchema.RestDayRecord
+typealias ConditioningScoreRecord = CurrentSchema.ConditioningScoreRecord
 
 protocol CloudKitSchemaSeedable {
     static func makeSeed() -> any PersistentModel
@@ -75,8 +76,15 @@ public extension ModelContainer {
         let desc = FetchDescriptor<SkillProgressionRecord>()
         let progressions = try container.mainContext.fetch(desc)
         let existingNames = Set(progressions.map { $0.skillName })
-        for def in SkillProgressions.defaultSkillProgressions where !existingNames.contains(def.skillName) {
-            container.mainContext.insert(SkillProgressionRecord(from: def))
+        for def in SkillProgressions.defaultSkillProgressions {
+            if !existingNames.contains(def.skillName) {
+                container.mainContext.insert(SkillProgressionRecord(from: def))
+            }
+            else if let progression = progressions.first(where: { p in
+                p.skillName == def.skillName
+            }) {
+                progression.levels = def.levels
+            }
         }
         try? container.mainContext.save()
     }

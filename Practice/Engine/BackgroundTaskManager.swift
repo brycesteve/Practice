@@ -186,6 +186,60 @@ public final class BackgroundTaskManager {
             AppGroupDefaults.shared.updateRecoveryData(recoveryData)
             WidgetCenter.shared.reloadAllTimelines()
             
+            // Compute conditioning score weekly (or if no record exists yet)
+            let weekStart = Calendar.current.date(
+                from: Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
+            ) ?? today
+            let condDescriptor = FetchDescriptor<ConditioningScoreRecord>(
+                predicate: #Predicate { $0.date >= weekStart }
+            )
+            let existingCond = try? context.fetch(condDescriptor).first
+            
+            if existingCond == nil {
+                let kbRecords   = (try? context.fetch(FetchDescriptor<KettlebellWeightRecord>())) ?? []
+                let allWorkouts = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
+                let bodyMass    = try? await HealthKitManager.shared.fetchLatestBodyMass()
+                
+                // Consistency: trained + rest days / target in last 28 days
+                let cal      = Calendar.current
+                let start28  = cal.date(byAdding: .day, value: -27, to: today)!
+                var credited = 0; var elapsed = 0
+                for offset in 0..<28 {
+                    let day = cal.date(byAdding: .day, value: offset, to: start28)!
+                    guard day <= today else { break }
+                    elapsed += 1
+                    if allWorkouts.contains(where: { cal.isDate($0.startDate, inSameDayAs: day) }) {
+                        credited += 1
+                    }
+                }
+                let target      = max(1, Int((Double(elapsed) * 5.0 / 7.0).rounded()))
+                let consistency = min(Double(credited) / Double(target), 1.0) * 100
+                
+                let engine = ConditioningEngine()
+                if let condResult = try? await engine.computeScore(
+                    workoutRecords:    allWorkouts,
+                    kbRecords:         kbRecords,
+                    bodyMassKg:        bodyMass,
+                    consistencyPercent: consistency
+                ) {
+                    let condRecord = ConditioningScoreRecord(date: weekStart,
+                                                             overallScore: condResult.overallScore)
+                    condRecord.hrRecoveryScore    = condResult.hrRecoveryScore
+                    condRecord.rhrTrendScore      = condResult.rhrTrendScore
+                    condRecord.hrvTrendScore      = condResult.hrvTrendScore
+                    condRecord.vo2TrendScore      = condResult.vo2TrendScore
+                    condRecord.consistencyScore   = condResult.consistencyScore
+                    condRecord.strengthRatioScore = condResult.strengthRatioScore
+                    condRecord.hrRecoveryRate     = condResult.hrRecoveryRate
+                    condRecord.rhrSlope           = condResult.rhrSlope
+                    condRecord.hrvSlope           = condResult.hrvSlope
+                    condRecord.vo2Slope           = condResult.vo2Slope
+                    condRecord.latestKBRatio      = condResult.kbRatio
+                    context.insert(condRecord)
+                    try? context.save()
+                }
+            }
+            
             // Push updated score to watch via WatchConnectivity
             syncScoreToWatch()
             

@@ -84,3 +84,20 @@ struct WorkoutSummaryView: View {
         return String(format: "%d:%02d", m, s)
     }
 }
+
+#if DEBUG
+#Preview {
+    WorkoutSummaryView(
+        plan: SessionPlan(
+            sessionType: .morning,
+            steps: WorkoutData.morningSteps,
+            estimatedDurationMinutes: 60
+        ),
+        completedExercises: [],
+        activeCalories: 300,
+        avgHeartRate: 150,
+        elapsedSeconds: 3600
+    )
+}
+
+#endif

@@ -134,6 +134,15 @@ public enum Exercises {
         notes: "Protract and retract fully"
     )
     
+    public static let scapPullUp = Exercise(
+        name: "Scapula Pull-Up",
+        category: .warmup,
+        setType: .reps,
+        defaultSets: 2,
+        defaultReps: 5,
+        notes: "Protract and retract fully"
+    )
+    
     public static let psuedoPlanchePush = Exercise(
         name: "Pseudo Planche Push-Up",
         category: .calisthenics,

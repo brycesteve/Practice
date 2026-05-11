@@ -1,3 +1,11 @@
+//
+//  ConditioningView.swift
+//  Practice
+//
+//  Created by Steve Bryce on 10/05/2026.
+//
+
+
 // ConditioningView.swift — iOS
 // Shows the weekly conditioning score — a trend-based measure of fitness
 // improvement separate from the daily readiness score.
@@ -22,7 +30,7 @@ struct ConditioningView: View {
     private var latestRecord: ConditioningScoreRecord? { history.first }
 
     var body: some View {
-        NavigationStack {
+        //NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
@@ -64,7 +72,7 @@ struct ConditioningView: View {
                 }
             }
             .refreshable { await recompute() }
-        }
+        //}
     }
 
     // MARK: - Main score card
@@ -298,11 +306,15 @@ struct ConditioningView: View {
     // MARK: - Computation
 
     private func recompute() async {
+        
         isLoading = true
-
-        let bm = bodyMassKg ?? (try? await HealthKitManager.shared.fetchLatestBodyMass())
+            
+        var bm = bodyMassKg
+        if bm == nil {
+            bm = try? await HealthKitManager.shared.fetchLatestBodyMass()
+        }
         bodyMassKg = bm
-
+        
         // Consistency
         let cal     = Calendar.current
         let today   = cal.startOfDay(for: Date())
@@ -318,7 +330,7 @@ struct ConditioningView: View {
         }
         let target      = max(1, Int((Double(elapsed) * 5.0 / 7.0).rounded()))
         let consistency = min(Double(credited) / Double(target), 1.0) * 100
-
+        
         let engine = ConditioningEngine()
         guard let result = try? await engine.computeScore(
             workoutRecords:     workouts,
@@ -329,19 +341,19 @@ struct ConditioningView: View {
             isLoading = false
             return
         }
-
+        
         // Upsert this week's record
         let weekStart = cal.date(
             from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())
         ) ?? today
-
+        
         let existing = history.first { $0.date >= weekStart }
         let record   = existing ?? {
             let r = ConditioningScoreRecord(date: weekStart, overallScore: result.overallScore)
             modelContext.insert(r)
             return r
         }()
-
+        
         record.overallScore       = result.overallScore
         record.hrRecoveryScore    = result.hrRecoveryScore
         record.rhrTrendScore      = result.rhrTrendScore
@@ -355,8 +367,9 @@ struct ConditioningView: View {
         record.vo2Slope           = result.vo2Slope
         record.latestKBRatio      = result.kbRatio
         try? modelContext.save()
-
+        
         isLoading = false
+   
     }
 
     // MARK: - Helpers

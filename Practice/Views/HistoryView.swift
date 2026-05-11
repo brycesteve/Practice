@@ -6,6 +6,7 @@ import SwiftUI
 import SwiftData
 
 struct HistoryView: View {
+    @Binding var path: NavigationPath
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var allWorkouts: [WorkoutRecord]
     @State private var filterType: SessionType? = nil
     
@@ -15,33 +16,32 @@ struct HistoryView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Picker("Filter", selection: $filterType) {
-                        Text("All").tag(Optional<SessionType>.none)
-                        ForEach(SessionType.allCases, id: \.self) { t in
-                            Text(t.displayName).tag(Optional(t))
-                        }
+
+        List {
+            Section {
+                Picker("Filter", selection: $filterType) {
+                    Text("All").tag(Optional<SessionType>.none)
+                    ForEach(SessionType.allCases, id: \.self) { t in
+                        Text(t.displayName).tag(Optional(t))
                     }
-                    .pickerStyle(.segmented)
                 }
-                .listRowBackground(Color.clear)
-                
-                ForEach(groupedByMonth(filtered), id: \.key) { section in
-                    Section(section.key) {
-                        ForEach(section.workouts) { workout in
-                            NavigationLink(value: workout) {
-                                WorkoutRowView(workout: workout)
-                            }
+                .pickerStyle(.segmented)
+            }
+            .listRowBackground(Color.clear)
+            
+            ForEach(groupedByMonth(filtered), id: \.key) { section in
+                Section(section.key) {
+                    ForEach(section.workouts) { workout in
+                        NavigationLink(value: workout) {
+                            WorkoutRowView(workout: workout)
                         }
                     }
                 }
             }
-            .navigationTitle("History")
-            .navigationDestination(for: WorkoutRecord.self) { workout in
-                WorkoutDetailView(workout: workout)
-            }
+        }
+        .navigationTitle("History")
+        .navigationDestination(for: WorkoutRecord.self) { workout in
+            WorkoutDetailView(workout: workout)
         }
     }
     

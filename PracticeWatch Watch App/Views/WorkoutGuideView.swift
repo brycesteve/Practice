@@ -877,3 +877,17 @@ struct SetLoggerView: View {
         kg.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(kg)) kg" : "\(kg) kg"
     }
 }
+
+#if DEBUG
+#Preview {
+    NavigationStack {
+        WorkoutGuideView(plan: SessionPlan(
+            sessionType: .morning,
+            steps: WorkoutData.morningSteps,
+            estimatedDurationMinutes: 60
+        ))
+    }
+        .environment(ErrorState())
+}
+
+#endif

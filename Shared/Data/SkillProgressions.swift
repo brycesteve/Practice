@@ -7,7 +7,206 @@
 
 public enum SkillProgressions {
     public static var defaultSkillProgressions: [SkillProgression] {
-        [SkillProgressions.planche, SkillProgressions.handstand, SkillProgressions.rings]
+        [
+            SkillProgressions.planche,
+            SkillProgressions.rings,
+            SkillProgressions.handstand,
+            SkillProgressions.frontLever,
+            SkillProgressions.compression,
+            SkillProgressions.pressHandstand
+        ]
+    }
+    
+    static var pressHandstand: SkillProgression {
+        SkillProgression(
+            skillName: "Press Handstand",
+            levels: [
+                SkillLevel(
+                    level: 1,
+                    name: "Pike Compression Lift",
+                    details: "Lift feet briefly from seated pike.",
+                    targetReps: 10,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 3,
+                        maxAverageDifficulty: 2.5,
+                        minReps: 10
+                    )
+                ),
+                SkillLevel(
+                    level: 2,
+                    name: "Crow Stand",
+                    details: "Balance knees on elbows.",
+                    targetDurationSeconds: 20,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 3,
+                        maxAverageDifficulty: 2.5,
+                        minDurationSeconds: 20
+                    )
+                ),
+                SkillLevel(
+                    level: 3,
+                    name: "Tuck Press Negative",
+                    details: "Slow lowering from handstand into tuck.",
+                    targetReps: 5,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 4,
+                        maxAverageDifficulty: 3.0,
+                        minReps: 5
+                    )
+                ),
+                SkillLevel(
+                    level: 4,
+                    name: "Box Press Handstand",
+                    details: "Use elevated feet to reduce load.",
+                    targetReps: 5,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 5,
+                        maxAverageDifficulty: 3.0,
+                        minReps: 5
+                    )
+                ),
+                SkillLevel(
+                    level: 5,
+                    name: "Straddle Press Handstand",
+                    details: "Controlled press into handstand.",
+                    targetReps: 1,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 6,
+                        maxAverageDifficulty: 3.5,
+                        minReps: 1
+                    )
+                ),
+            ],
+            currentLevel: 1
+        )
+    }
+    
+    static var compression: SkillProgression {
+        SkillProgression(
+            skillName: "Compression",
+            levels: [
+                SkillLevel(
+                    level: 1,
+                    name: "Tuck Sit",
+                    details: "Feet lifted slightly with knees tucked.",
+                    targetDurationSeconds: 20,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 3,
+                        maxAverageDifficulty: 2.5,
+                        minDurationSeconds: 20
+                    )
+                ),
+                SkillLevel(
+                    level: 2,
+                    name: "Single Leg Extension",
+                    details: "Alternate one leg extended while maintaining lift.",
+                    targetDurationSeconds: 20,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 3,
+                        maxAverageDifficulty: 2.5,
+                        minDurationSeconds: 20
+                    )
+                ),
+                SkillLevel(
+                    level: 3,
+                    name: "L-Sit",
+                    details: "Legs straight, hips lifted, shoulders depressed.",
+                    targetDurationSeconds: 15,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 4,
+                        maxAverageDifficulty: 3.0,
+                        minDurationSeconds: 15
+                    )
+                ),
+                SkillLevel(
+                    level: 4,
+                    name: "Extended L-Sit",
+                    details: "Longer hold with active compression.",
+                    targetDurationSeconds: 30,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 4,
+                        maxAverageDifficulty: 3.0,
+                        minDurationSeconds: 30
+                    )
+                ),
+                SkillLevel(
+                    level: 5,
+                    name: "V-Sit Prep",
+                    details: "Elevate legs above horizontal briefly.",
+                    targetDurationSeconds: 10,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 5,
+                        maxAverageDifficulty: 3.5,
+                        minDurationSeconds: 10
+                    )
+                ),
+            ],
+            currentLevel: 1
+        )
+    }
+    
+    static var frontLever: SkillProgression {
+        SkillProgression(
+            skillName: "Front Lever",
+            levels: [
+                SkillLevel(
+                    level: 1,
+                    name: "Tuck Front Lever",
+                    details: "Knees tucked, hips level with shoulders.",
+                    targetDurationSeconds: 15,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 3,
+                        maxAverageDifficulty: 2.5,
+                        minDurationSeconds: 15
+                    )
+                ),
+                SkillLevel(
+                    level: 2,
+                    name: "Advanced Tuck Front Lever",
+                    details: "Open hips slightly while maintaining flat back.",
+                    targetDurationSeconds: 12,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 4,
+                        maxAverageDifficulty: 3.0,
+                        minDurationSeconds: 12
+                    )
+                ),
+                SkillLevel(
+                    level: 3,
+                    name: "One Leg Front Lever",
+                    details: "Alternate extended leg while maintaining body line.",
+                    targetDurationSeconds: 10,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 4,
+                        maxAverageDifficulty: 3.0,
+                        minDurationSeconds: 10
+                    )
+                ),
+                SkillLevel(
+                    level: 4,
+                    name: "Straddle Front Lever",
+                    details: "Wide straddle with flat hips and straight arms.",
+                    targetDurationSeconds: 8,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 5,
+                        maxAverageDifficulty: 3.0,
+                        minDurationSeconds: 8
+                    )
+                ),
+                SkillLevel(
+                    level: 5,
+                    name: "Full Front Lever",
+                    details: "Body parallel with legs together.",
+                    targetDurationSeconds: 5,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 5,
+                        maxAverageDifficulty: 3.5,
+                        minDurationSeconds: 5
+                    )
+                ),
+            ],
+            currentLevel: 1
+        )
     }
     
     static var planche: SkillProgression {
@@ -173,7 +372,7 @@ public enum SkillProgressions {
                 SkillLevel(
                     level: 1,
                     name: "Ring Support Hold",
-                    details: "Arms locked, rings turned out. Build to 3 × 30s.",
+                    details: "Arms locked, rings turned out slightly. Build stability.",
                     targetDurationSeconds: 30,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
@@ -181,22 +380,35 @@ public enum SkillProgressions {
                         minDurationSeconds: 30
                     )
                 ),
+                
                 SkillLevel(
                     level: 2,
                     name: "Ring Dip",
-                    details:
-                        "Full ROM, rings turned out at top. Build to 3 × 10.",
-                    targetReps: 10,
+                    details: "Controlled full ROM dips with stable support.",
+                    targetReps: 8,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minReps: 10
+                        minReps: 8
                     )
                 ),
+                
                 SkillLevel(
                     level: 3,
+                    name: "False Grip Hang",
+                    details: "Develop wrist tolerance and false grip endurance.",
+                    targetDurationSeconds: 30,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 3,
+                        maxAverageDifficulty: 2.5,
+                        minDurationSeconds: 30
+                    )
+                ),
+                
+                SkillLevel(
+                    level: 4,
                     name: "False Grip Pull-Up",
-                    details: "Wrist over the ring. Build to 3 × 5.",
+                    details: "Pull chest high while maintaining false grip.",
                     targetReps: 5,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 4,
@@ -204,11 +416,23 @@ public enum SkillProgressions {
                         minReps: 5
                     )
                 ),
+                
                 SkillLevel(
-                    level: 4,
+                    level: 5,
+                    name: "Low Ring Transition",
+                    details: "Practice transition mechanics close to the floor.",
+                    targetReps: 5,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 4,
+                        maxAverageDifficulty: 3.0,
+                        minReps: 5
+                    )
+                ),
+                
+                SkillLevel(
+                    level: 6,
                     name: "Muscle-Up Negative",
-                    details:
-                        "Jump to support, 5s descent through transition. Build to 5 × 3.",
+                    details: "Controlled descent through transition.",
                     targetReps: 3,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 4,
@@ -216,11 +440,11 @@ public enum SkillProgressions {
                         minReps: 3
                     )
                 ),
+                
                 SkillLevel(
-                    level: 5,
-                    name: "Assisted Muscle-Up",
-                    details:
-                        "Band or jump assisted. Focus on transition. Build to 5 × 3.",
+                    level: 7,
+                    name: "Assisted Ring Muscle-Up",
+                    details: "Band or foot-assisted full movement.",
                     targetReps: 3,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 5,
@@ -228,10 +452,11 @@ public enum SkillProgressions {
                         minReps: 3
                     )
                 ),
+                
                 SkillLevel(
-                    level: 6,
-                    name: "Ring Muscle-Up",
-                    details: "Strict ring muscle-up from dead hang. The goal.",
+                    level: 8,
+                    name: "Strict Ring Muscle-Up",
+                    details: "Controlled strict muscle-up from dead hang.",
                     targetReps: 1,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 5,

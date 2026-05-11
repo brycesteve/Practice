@@ -10,12 +10,14 @@ struct DashboardView: View {
     @Query private var progressionRecords: [SkillProgressionRecord]
     @Query private var settingsResults: [AppSettings]
     @Query private var restDays: [RestDayRecord]
+    @Query(sort: \ConditioningScoreRecord.date, order: .reverse)
+    private var conditioningHistory: [ConditioningScoreRecord]
     
     @State private var latestWeightKg: Double? = nil
     @State private var latestVO2Max: Double?   = nil
     @State private var recoveryScore: RecoveryScore? = nil
-    @State private var showRecovery = false
     @State private var showEveningPreview = false
+    @State private var path = NavigationPath()
     
     private var settings: AppSettings { settingsResults.first ?? AppSettings() }
     
@@ -46,7 +48,7 @@ struct DashboardView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     
@@ -62,6 +64,9 @@ struct DashboardView: View {
                     
                     // Recovery card
                     recoveryCard
+                    
+                    // Conditioning card
+                    conditioningCard
                     
                     // Weekly streak
                     weeklyStreak
@@ -88,7 +93,22 @@ struct DashboardView: View {
             }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .recovery:
+                    RecoveryView()
+                case .conditioning:
+                    ConditioningView()
+                case .bodyStats:
+                    BodyStatsView()
+                case .history:
+                    HistoryView(path: $path)
+                default:
+                    EmptyView()
+                }
+            }
         }
+        
     }
     
     // MARK: - Subviews
@@ -226,11 +246,9 @@ struct DashboardView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .buttonStyle(.plain)
@@ -244,7 +262,9 @@ struct DashboardView: View {
     
     @ViewBuilder
     private var recoveryCard: some View {
-        NavigationLink(destination: RecoveryView()) {
+        Button{
+            path.append(Route.recovery)
+        } label: {
             CardView {
                 HStack(spacing: 14) {
                     ZStack {
@@ -293,11 +313,61 @@ struct DashboardView: View {
                                 .font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
+                    
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+    
+    @ViewBuilder
+    private var conditioningCard: some View {
+        let record = conditioningHistory.first
+        Button {
+            path.append(Route.conditioning)
+        } label: {
+            CardView {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 6)
+                        if let r = record {
+                            Circle()
+                                .trim(from: 0, to: r.overallScore / 100)
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [.red, .orange, .yellow, .green],
+                                        center: .center,
+                                        startAngle: .degrees(-90),
+                                        endAngle: .degrees(270)
+                                    ),
+                                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                        }
+                        if let r = record {
+                            Text("\(Int(r.overallScore))")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                        } else {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 52, height: 52)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Conditioning")
+                            .font(.headline).foregroundStyle(.primary)
+                        if let r = record {
+                            Text("\(r.trendEmoji) \(r.trendLabel)")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        } else {
+                            Text("Tap to compute")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                }.frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .buttonStyle(.plain)
@@ -308,10 +378,30 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Stats").font(.headline).padding(.horizontal)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                StatCard(title: "This Month", value: "\(thisMonthCount)",        unit: "sessions", color: .blue)
-                StatCard(title: "Total",      value: "\(allWorkouts.count)",     unit: "workouts", color: .purple)
-                StatCard(title: "Morning",    value: "\(workoutCount(for: .morning))", unit: "sessions", color: .orange)
-                StatCard(title: "Evening",    value: "\(workoutCount(for: .evening))", unit: "sessions", color: .indigo)
+                Button {
+                    path.append(Route.history)
+                } label: {
+                    StatCard(title: "This Month", value: "\(thisMonthCount)",        unit: "sessions", color: .blue)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    path.append(Route.history)
+                } label: {
+                    StatCard(title: "Total",      value: "\(allWorkouts.count)",     unit: "workouts", color: .purple)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    path.append(Route.history)
+                } label: {
+                    StatCard(title: "Morning",    value: "\(workoutCount(for: .morning))", unit: "sessions", color: .orange)
+                }
+                .buttonStyle(.plain)
+                Button {
+                    path.append(Route.history)
+                } label: {
+                    StatCard(title: "Evening",    value: "\(workoutCount(for: .evening))", unit: "sessions", color: .indigo)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal)
         }
@@ -322,16 +412,30 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Body Stats").font(.headline).padding(.horizontal)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                if let kg = latestWeightKg {
-                    StatCard(title: "Body Weight", value: String(format: "%.1f", kg), unit: "kg", color: .teal)
-                } else {
-                    StatCard(title: "Body Weight", value: "–", unit: "Log via Health", color: .teal)
+                
+                Button {
+                    path.append(Route.bodyStats)
+                } label: {
+                    if let kg = latestWeightKg {
+                        StatCard(title: "Body Weight", value: String(format: "%.1f", kg), unit: "kg", color: .teal)
+                    } else {
+                        StatCard(title: "Body Weight", value: "–", unit: "Log via Health", color: .teal)
+                    }
                 }
-                if let vo2 = latestVO2Max {
-                    StatCard(title: "VO₂ Max", value: String(format: "%.1f", vo2), unit: "mL/kg/min", color: .green)
-                } else {
-                    StatCard(title: "VO₂ Max", value: "–", unit: "Needs outdoor run", color: .green)
+                .buttonStyle(.plain)
+                
+                Button {
+                    path.append(Route.bodyStats)
+                } label: {
+                    if let vo2 = latestVO2Max {
+                        StatCard(title: "VO₂ Max", value: String(format: "%.1f", vo2), unit: "mL/kg/min", color: .green)
+                    } else {
+                        StatCard(title: "VO₂ Max", value: "–", unit: "Needs outdoor run", color: .green)
+                    }
                 }
+                .buttonStyle(.plain)
+                
+                
             }
             .padding(.horizontal)
         }

@@ -23,6 +23,7 @@ enum TrainingSchemaV1: VersionedSchema {
         AppSettings.self,
         RecoveryScoreRecord.self,
         RestDayRecord.self,
+        ConditioningScoreRecord.self
     ]}
     
     // MARK: - Workout Records
@@ -545,4 +546,64 @@ enum TrainingSchemaV1: VersionedSchema {
         }
     }
     
+    // MARK: - Conditioning Score Record (updated weekly)
+    
+    @Model
+    public final class ConditioningScoreRecord: CloudKitSchemaSeedable {
+        public var id: UUID = UUID()
+        public var date: Date = Date()                  // start of week
+        public var overallScore: Double = 0             // 0–100
+        public var hrRecoveryScore: Double? = nil       // component scores
+        public var rhrTrendScore: Double? = nil
+        public var hrvTrendScore: Double? = nil
+        public var vo2TrendScore: Double? = nil
+        public var consistencyScore: Double? = nil
+        public var strengthRatioScore: Double? = nil
+        public var hrRecoveryRate: Double? = nil        // raw: bpm drop in 60s
+        public var rhrSlope: Double? = nil              // raw: bpm/day (negative = improving)
+        public var hrvSlope: Double? = nil              // raw: ms/day (positive = improving)
+        public var vo2Slope: Double? = nil              // raw: ml/kg/min per day
+        public var latestKBRatio: Double? = nil         // swing PB kg / bodyweight kg
+        
+        public var trendLabel: String {
+            switch overallScore {
+            case 75...:   return "Strong upward trend"
+            case 55..<75: return "Gradual improvement"
+            case 45..<55: return "Holding steady"
+            case 25..<45: return "Slight decline"
+            default:      return "Needs attention"
+            }
+        }
+        
+        public var trendEmoji: String {
+            switch overallScore {
+            case 70...:   return "📈"
+            case 50..<70: return "➡️"
+            default:      return "📉"
+            }
+        }
+        
+        public init(id: UUID = UUID(), date: Date = .now, overallScore: Double) {
+            self.id           = id
+            self.date         = date
+            self.overallScore = overallScore
+        }
+        
+        static func makeSeed() -> any PersistentModel {
+            let c = ConditioningScoreRecord(id: UUID(), overallScore: 10)
+            c.date = .now
+            c.hrRecoveryScore = 10
+            c.rhrTrendScore = 10
+            c.hrvTrendScore = 10
+            c.vo2TrendScore = 20
+            c.consistencyScore = 10
+            c.strengthRatioScore = 10
+            c.hrRecoveryRate = 10
+            c.rhrSlope = 1
+            c.hrvSlope = 1
+            c.vo2Slope = 1
+            c.latestKBRatio = 2
+            return c
+        }
+    }
 }

@@ -8,9 +8,6 @@ struct ContentView: View {
             DashboardView()
                 .tabItem { Label("Dashboard", systemImage: "chart.bar.fill") }
             
-            RecoveryView()
-                .tabItem { Label("Recovery", systemImage: "heart.text.square.fill") }
-            
             ProgressionView()
                 .tabItem { Label("Skills", systemImage: "figure.gymnastics") }
             
@@ -20,14 +17,20 @@ struct ContentView: View {
             PersonalRecordsView()
                 .tabItem { Label("Records", systemImage: "trophy.fill") }
             
-            BodyStatsView()
-                .tabItem { Label("Body", systemImage: "scalemass.fill") }
-            
-            HistoryView()
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
-            
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
         }
     }
+}
+
+
+enum Route: Hashable {
+    case dashboard
+    case recovery
+    case conditioning
+    case kettleProgress
+    case personalRecords
+    case bodyStats
+    case history
+    case settings
 }

@@ -55,7 +55,7 @@ struct ReadinessGaugeView: View {
                         Image("kettlebell.flat")
                     }
                     .gaugeStyle(.accessoryCircular)
-                    .tint(gaugeGradient)
+                    .tint(readinessColor(score))
                 } else {
                     Gauge(value: 0, in: 0...100) {
                         Text("–").font(.caption2)
@@ -77,7 +77,11 @@ struct ReadinessGaugeView: View {
                     .font(.system(size: 12, weight: .bold, design: .rounded))
             }
             .gaugeStyle(.accessoryCircularCapacity)
-            .tint(gaugeGradient)
+            .tint(
+                entry.readinessScore != nil ? readinessColor(
+                    entry.readinessScore
+                ) : .gray
+            )
             
         case .accessoryInline:
             Label {
@@ -93,6 +97,17 @@ struct ReadinessGaugeView: View {
     
     private var gaugeGradient: Gradient {
         Gradient(colors: [.red, .orange, .yellow, .green])
+    }
+    
+    private func readinessColor(_ score: Double?) -> Color {
+        guard let score else { return .gray }
+        switch score {
+        case 85...100: return .green
+        case 70..<85:  return .blue
+        case 50..<70:  return .yellow
+        case 30..<50:  return .orange
+        default:       return .red
+        }
     }
 }
 
@@ -150,16 +165,7 @@ struct TrainingTimelineProvider: TimelineProvider {
         )
     }
     
-    private func readinessColor(_ score: Double?) -> Color {
-        guard let score else { return .gray }
-        switch score {
-        case 85...100: return .green
-        case 70..<85:  return .blue
-        case 50..<70:  return .yellow
-        case 30..<50:  return .orange
-        default:       return .red
-        }
-    }
+    
 }
 
 // MARK: - Bundle

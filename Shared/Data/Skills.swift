@@ -9,16 +9,29 @@ public enum Skill: String, RawRepresentable, CaseIterable {
     case planche = "Planche"
     case handstand = "Handstand"
     case rings = "Ring Skills"
+    case pressHandstand = "Press Handstand"
+    case compression = "Compression"
+    case frontLever = "Front Lever"
     
     static var activeSkills: [Skill] {
-        [.planche, .handstand, .rings]
+        [
+            .planche,
+            .rings,
+            .handstand,
+            .frontLever,
+            .compression,
+            .pressHandstand
+        ]
     }
     
     var icon: String {
         switch self {
-        case .planche:     return "figure.gymnastics"
-        case .handstand:   return "figure.stand"
-        case .rings: return "circle.circle"
+        case .planche:     return "figure.strengthtraining.traditional"
+        case .handstand:   return "figure.cooldown"
+        case .rings: return "link"
+        case .compression: return "figure.flexibility"
+        case .frontLever: return "figure.rower"
+        case .pressHandstand: return "figure.mind.and.body"
         }
     }
     
@@ -27,6 +40,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
         case .planche:     return .purple
         case .handstand:   return .blue
         case .rings: return .orange
+        case .compression: return .red
+        case .frontLever: return .indigo
+        case .pressHandstand: return .green
         }
     }
     
@@ -40,6 +56,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
         case .planche: return plancheRoutine(currentLevel: currentLevel)
         case .handstand: return handstandRoutine(currentLevel: currentLevel)
         case .rings: return ringsRoutine(currentLevel: currentLevel)
+        case .compression: return compressionRoutine(currentLevel: currentLevel)
+        case .frontLever: return frontLeverRoutine(currentLevel: currentLevel)
+        case .pressHandstand: return pressHandstandRoutine(currentLevel: currentLevel)
         }}()
         
         return routine + coreStretches()
@@ -97,7 +116,7 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 exercise: Exercises.scapPushUp,
                 sets: 2,
                 reps: 10,
-                restSeconds: 30,
+                restSeconds: 10,
                 circuitGroupID: warmupGroup
             ),
             
@@ -116,18 +135,6 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 notes: "Log actual hold time and rate effort."
             ),
             
-            WorkoutStep(
-                exercise: Exercises.psuedoPlanchePush,
-                sets: 3,
-                reps: 8,
-                restSeconds: 90
-            ),
-            WorkoutStep(
-                exercise: Exercises.plancheLeanHold,
-                sets: 3,
-                durationSeconds: 20,
-                restSeconds: 60
-            ),
         ] + plancheStretches()
     }
     
@@ -179,7 +186,7 @@ public enum Skill: String, RawRepresentable, CaseIterable {
     -> [WorkoutStep]
     {
         let warmupGroup = UUID()
-        
+       
         return [
             WorkoutStep(
                 exercise: Exercise(
@@ -224,34 +231,7 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 durationSeconds: currentLevel?.targetDurationSeconds ?? 30,
                 restSeconds: 90,
                 notes: "Log your best hold time each attempt."
-            ),
-            
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Handstand Walk / Shoulder Taps",
-                    category: .calisthenics,
-                    setType: .timed,
-                    defaultSets: 3,
-                    defaultDuration: 30,
-                    notes: "Controlled movement or taps"
-                ),
-                sets: 3,
-                durationSeconds: 30,
-                restSeconds: 60
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Pike Compression Hold",
-                    category: .calisthenics,
-                    setType: .timed,
-                    defaultSets: 3,
-                    defaultDuration: 20,
-                    notes: "Builds body tension for HS"
-                ),
-                sets: 3,
-                durationSeconds: 20,
-                restSeconds: 60
-            ),
+            )
         ] + handstandStretches()
     }
     
@@ -303,20 +283,33 @@ public enum Skill: String, RawRepresentable, CaseIterable {
     -> [WorkoutStep]
     {
         let warmupGroup = UUID()
-        
         return [
             WorkoutStep(
                 exercise: Exercise(
-                    name: "Ring Support Hold",
+                    name: "False Grip Pulses",
                     category: .warmup,
                     setType: .timed,
                     defaultSets: 2,
                     defaultDuration: 20,
-                    notes: "Rings turned out. Lock arms."
+                    notes: "Strengthen wrists"
                 ),
                 sets: 2,
                 durationSeconds: 20,
                 restSeconds: 15,
+                circuitGroupID: warmupGroup
+            ),
+            WorkoutStep(
+                exercise: Exercises.scapPullUp,
+                sets: 2,
+                reps: 5,
+                restSeconds: 20,
+                circuitGroupID: warmupGroup
+            ),
+            WorkoutStep(
+                exercise: Exercises.scapPushUp,
+                sets: 2,
+                reps: 5,
+                restSeconds: 20,
                 circuitGroupID: warmupGroup
             ),
             WorkoutStep(
@@ -350,32 +343,6 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 notes: "Log actual reps and difficulty."
             ),
             
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Ring Dip",
-                    category: .calisthenics,
-                    setType: .reps,
-                    defaultSets: 3,
-                    defaultReps: 8,
-                    notes: "Full ROM, rings turned out at top"
-                ),
-                sets: 3,
-                reps: 8,
-                restSeconds: 90
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Ring Pull-Up",
-                    category: .calisthenics,
-                    setType: .reps,
-                    defaultSets: 3,
-                    defaultReps: 6,
-                    notes: "3s descent each rep"
-                ),
-                sets: 3,
-                reps: 6,
-                restSeconds: 90
-            ),
         ] + ringStretches()
     }
     
@@ -388,6 +355,278 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                     setType: .timed,
                     defaultSets: 2,
                     defaultDuration: 45,
+                    notes: "Full thoracic mobility"
+                ),
+                sets: 2,
+                durationSeconds: 45,
+                restSeconds: 15
+            ),
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "German Hang",
+                    category: .stretch,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 30,
+                    notes: "Full shoulder retraction"
+                ),
+                sets: 2,
+                durationSeconds: 30,
+                restSeconds: 60
+            ),
+        ]
+    }
+
+    
+    private func frontLeverRoutine(currentLevel: SkillLevel?)
+    -> [WorkoutStep]
+    {
+        let warmupGroup = UUID()
+        return [
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Dead Hang",
+                    category: .warmup,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 15,
+                    notes: "Total dead hang"
+                ),
+                sets: 2,
+                durationSeconds: 15,
+                restSeconds: 30,
+                circuitGroupID: warmupGroup
+            ),
+            WorkoutStep(
+                exercise: Exercises.scapPullUp,
+                sets: 2,
+                reps: 5,
+                restSeconds: 20,
+                circuitGroupID: warmupGroup
+            ),
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Hollow hold",
+                    category: .warmup,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 15,
+                    notes: "Hold anterior tension"
+                ),
+                sets: 2,
+                durationSeconds: 15,
+                restSeconds: 30,
+                circuitGroupID: warmupGroup
+            ),
+            
+            WorkoutStep(
+                exercise: Exercise(
+                    name: currentLevel?.name ?? "Tuck Front Lever",
+                    category: .skillProgression,
+                    setType: .timed,
+                    defaultSets: 5,
+                    defaultReps: currentLevel?.targetDurationSeconds ?? 15,
+                    notes: currentLevel?.details
+                    ?? "Kness Tucked. Hips in line with elbows"
+                ),
+                sets: 5,
+                durationSeconds: currentLevel?.targetDurationSeconds ?? 15,
+                restSeconds: 120,
+                notes: "Log actual reps and difficulty."
+            ),
+            
+        ] + frontLeverStretches()
+    }
+    
+    private func frontLeverStretches() -> [WorkoutStep] {
+        [
+            
+        ]
+    }
+    
+    private func compressionRoutine(currentLevel: SkillLevel?)
+    -> [WorkoutStep]
+    {
+        let warmupGroup = UUID()
+        return [
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Pike Compression Pulses",
+                    category: .warmup,
+                    setType: .reps,
+                    defaultSets: 2,
+                    defaultReps: 10,
+                    notes: "Pike sit and lift feet"
+                ),
+                sets: 2,
+                reps: 15,
+                restSeconds: 30,
+                circuitGroupID: warmupGroup
+            ),
+            
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Hollow hold",
+                    category: .warmup,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 15,
+                    notes: "Hold anterior tension"
+                ),
+                sets: 2,
+                durationSeconds: 15,
+                restSeconds: 30,
+                circuitGroupID: warmupGroup
+            ),
+            
+            WorkoutStep(
+                exercise: Exercise(
+                    name: currentLevel?.name ?? "Tuck Front Lever",
+                    category: .skillProgression,
+                    setType: .timed,
+                    defaultSets: 5,
+                    defaultReps: currentLevel?.targetDurationSeconds ?? 15,
+                    notes: currentLevel?.details
+                    ?? "Kness Tucked. Hips in line with elbows"
+                ),
+                sets: 5,
+                durationSeconds: currentLevel?.targetDurationSeconds ?? 15,
+                restSeconds: 120,
+                notes: "Log actual reps and difficulty."
+            ),
+            
+        ] + compressionStretches()
+    }
+    
+    private func compressionStretches() -> [WorkoutStep] {
+        [
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Pancake Stretch",
+                    category: .stretch,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 30,
+                    notes: "Straddle forward fold"
+                ),
+                sets: 2,
+                durationSeconds: 30,
+                restSeconds: 30
+            ),
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Calf Stretch",
+                    category: .stretch,
+                    setType: .timed,
+                    defaultSets: 4,
+                    defaultDuration: 30,
+                    notes: "Toe on step and stretch down. Alternate sides"
+                ),
+                sets: 4,
+                durationSeconds: 30,
+                restSeconds: 15
+            ),
+        ]
+    }
+    
+    private func pressHandstandRoutine(currentLevel: SkillLevel?)
+    -> [WorkoutStep]
+    {
+        let warmupGroup = UUID()
+        return [
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Pike Compression pulses",
+                    category: .warmup,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 20,
+                    notes: "Pike sit and lift feet"
+                ),
+                sets: 2,
+                durationSeconds: 20,
+                restSeconds: 15,
+                circuitGroupID: warmupGroup
+            ),
+            
+            WorkoutStep(
+                exercise: Exercises.wristStretches,
+                sets: 2,
+                durationSeconds: 30,
+                restSeconds: 10,
+                circuitGroupID: warmupGroup
+            ),
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Wall shoulder shrug",
+                    category: .warmup,
+                    setType: .reps,
+                    defaultSets: 2,
+                    defaultReps: 10,
+                    notes: "Full movement of shoulders"
+                ),
+                sets: 2,
+                reps: 10,
+                restSeconds: 15,
+                circuitGroupID: warmupGroup
+            ),
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Crow pose hold",
+                    category: .warmup,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 20,
+                    notes: "Crow pose"
+                ),
+                sets: 2,
+                durationSeconds: 20,
+                restSeconds: 30,
+                circuitGroupID: warmupGroup
+            ),
+        
+            
+            WorkoutStep(
+                exercise: Exercise(
+                    name: currentLevel?.name ?? "Pike compression lift",
+                    category: .skillProgression,
+                    setType: .reps,
+                    defaultSets: 5,
+                    defaultReps: currentLevel?.targetReps ?? 10,
+                    notes: currentLevel?.details
+                    ?? "Lift feet briefly from seated pike."
+                ),
+                sets: 5,
+                reps: currentLevel?.targetReps ?? 10,
+                restSeconds: 60,
+                notes: "Log actual reps and difficulty."
+            ),
+            
+        ] + pressHandstandStretches()
+    }
+    
+    private func pressHandstandStretches() -> [WorkoutStep] {
+        [
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Pancake Stretch",
+                    category: .stretch,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 30,
+                    notes: "Straddle forward fold"
+                ),
+                sets: 2,
+                durationSeconds: 30,
+                restSeconds: 30
+            ),
+            WorkoutStep(
+                exercise: Exercise(
+                    name: "Chest & Shoulder Stretch",
+                    category: .stretch,
+                    setType: .timed,
+                    defaultSets: 2,
+                    defaultDuration: 45,
                     notes: "Each side"
                 ),
                 sets: 2,
@@ -396,32 +635,20 @@ public enum Skill: String, RawRepresentable, CaseIterable {
             ),
             WorkoutStep(
                 exercise: Exercise(
-                    name: "Passive Bar Hang",
+                    name: "Bridge Hold",
                     category: .stretch,
                     setType: .timed,
                     defaultSets: 2,
                     defaultDuration: 30,
-                    notes: "Let shoulders fully relax"
+                    notes: "Full thoracic extension"
                 ),
                 sets: 2,
                 durationSeconds: 30,
-                restSeconds: 15
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Bicep Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Arm extended, palm up, rotate out"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 15
+                restSeconds: 30
             ),
         ]
     }
+
 
 }
 
