@@ -54,6 +54,54 @@ struct TrainingWidgetProvider: TimelineProvider {
     }
 }
 
+struct ReadinessGauge: View {
+    let entry: TrainingWidgetEntry
+    
+    var body: some View {
+        ZStack {
+            if let score = entry.readinessScore {
+                Gauge(value: score, in: 0...100) {
+                    Text("\(Int(score))%")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .minimumScaleFactor(0.5)
+                } currentValueLabel: {
+                    Image("kettlebell.flat")
+                }
+                .gaugeStyle(.accessoryCircular)
+                .scaleEffect(1.5)
+                .tint(readinessColor(score))
+            } else {
+                Gauge(value: 0, in: 0...100) {
+                    Text("–").font(.caption2)
+                } currentValueLabel: {
+                    Image("kettlebell.flat")
+                }
+                .gaugeStyle(.accessoryCircular)
+                .scaleEffect(1.5)
+                .tint(.gray)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .containerBackground(for: .widget) {
+            Color(.systemBackground)
+        }
+    }
+    
+    private func readinessColor(_ score: Double?) -> Color {
+        guard let score else { return .gray }
+        switch score {
+        case 85...100: return .green
+        case 70..<85:  return .blue
+        case 50..<70:  return .yellow
+        case 30..<50:  return .orange
+        default:       return .red
+        }
+    }
+}
+
+
+
 // MARK: - Small widget view
 
 struct SmallWidgetView: View {
@@ -202,15 +250,34 @@ struct TrainingWidget: Widget {
     @Environment(\.widgetFamily) private var widgetFamily
 }
 
+struct ReadinessWidget: Widget {
+    let kind = "ReadinessWidget"
+    
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: TrainingWidgetProvider()) { entry in
+            switch widgetFamily {
+            default:
+                ReadinessGauge(entry: entry)
+            }
+        }
+        .configurationDisplayName("Readiness")
+        .description("Lock screen readiness view")
+        .supportedFamilies([.accessoryCircular, .systemSmall])
+    }
+    
+    @Environment(\.widgetFamily) private var widgetFamily
+}
+
 @main
 struct TrainingWidgetBundle: WidgetBundle {
     var body: some Widget {
         TrainingWidget()
+        ReadinessWidget()
     }
 }
 
-#Preview(as: .accessoryCircular) {
-    TrainingWidget()
+#Preview(as: .systemSmall) {
+    ReadinessWidget()
 } timeline: {
     TrainingWidgetEntry.placeholder
 }

@@ -656,7 +656,7 @@
 				CODE_SIGN_ENTITLEMENTS = Practice/Practice.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -693,7 +693,7 @@
 				CODE_SIGN_ENTITLEMENTS = Practice/Practice.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -730,7 +730,7 @@
 				CODE_SIGN_ENTITLEMENTS = "PracticeWatch Watch App/PracticeWatch Watch App.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -767,7 +767,7 @@
 				CODE_SIGN_ENTITLEMENTS = "PracticeWatch Watch App/PracticeWatch Watch App.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -803,7 +803,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWatchWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
@@ -843,7 +843,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWatchWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
@@ -883,7 +883,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;
@@ -918,7 +918,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;

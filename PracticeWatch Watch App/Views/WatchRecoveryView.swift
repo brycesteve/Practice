@@ -17,12 +17,8 @@ import SwiftUI
 import SwiftData
 
 struct WatchRecoveryView: View {
-    @State private var score: RecoveryScore? = nil
-    @State private var syncedScoreOnly: Double? = nil
+    @State private var score: RecoveryDataDTO? = nil
     @State private var isLoading = true
-    @State private var source: DataSource = .unknown
-    
-    enum DataSource { case synced, liveHK, unknown }
     
     var body: some View {
         ScrollView {
@@ -42,10 +38,6 @@ struct WatchRecoveryView: View {
                     scoreHeader(score)
                     metricsSection(score)
                     adviceSection(score)
-                    footer
-                    
-                } else if let synced = syncedScoreOnly {
-                    syncedScoreView(synced)
                     
                 } else {
                     emptyState
@@ -56,31 +48,30 @@ struct WatchRecoveryView: View {
         .navigationTitle("Recovery")
         .task { await load() }
         .onReceive(NotificationCenter.default.publisher(for: .recoveryScoreReceived)) { notification in
-            if let s = notification.userInfo?["score"] as? Double {
-                syncedScoreOnly = s
-                if score == nil { isLoading = false }
+            Task {
+                await load()
             }
         }
     }
     
     // MARK: - Score Header (Primary)
     
-    private func scoreHeader(_ score: RecoveryScore) -> some View {
+    private func scoreHeader(_ score: RecoveryDataDTO) -> some View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.25), lineWidth: 10)
                 
                 Circle()
-                    .trim(from: 0, to: score.overall / 100)
+                    .trim(from: 0, to: score.overallScore / 100)
                     .stroke(
-                        scoreColor(score.overall),
+                        scoreColor(score.overallScore),
                         style: StrokeStyle(lineWidth: 10, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
                 
                 VStack(spacing: 2) {
-                    Text("\(Int(score.overall))")
+                    Text("\(Int(score.overallScore))")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                     Text("Recovery")
                         .font(.system(size: 10))
@@ -89,9 +80,9 @@ struct WatchRecoveryView: View {
             }
             .frame(width: 80, height: 80)
             
-            Text(score.label)
+            Text(labelFor(score.overallScore))
                 .font(.headline)
-                .foregroundStyle(scoreColor(score.overall))
+                .foregroundStyle(scoreColor(score.overallScore))
         }
         .padding(.vertical, 6)
         .padding(.top, 20)
@@ -99,21 +90,21 @@ struct WatchRecoveryView: View {
     
     // MARK: - Metrics Section (Secondary)
     
-    private func metricsSection(_ score: RecoveryScore) -> some View {
+    private func metricsSection(_ score: RecoveryDataDTO) -> some View {
         VStack(spacing: 8) {
-            if let hrv = score.metrics.hrv {
+            if let hrv = score.hrv {
                 metricRow("waveform.path.ecg", "HRV", String(format: "%.0f ms", hrv), .purple)
             }
-            if let rhr = score.metrics.restingHeartRate {
+            if let rhr = score.restingHR {
                 metricRow("heart.fill", "Rest HR", String(format: "%.0f bpm", rhr), .red)
             }
-            if let sleep = score.metrics.sleepDuration {
+            if let sleep = score.sleepHours {
                 metricRow("bed.double.fill", "Sleep", String(format: "%.1f hrs", sleep), .indigo)
             }
-            if let quality = score.metrics.sleepQualityPercent {
+            if let quality = score.sleepQualityScore {
                 metricRow("moon.zzz.fill", "Sleep Quality", String(format: "%.0f%%", quality), .indigo)
             }
-            if let resp = score.metrics.respiratoryRate {
+            if let resp = score.respiratoryRate {
                 metricRow("lungs.fill", "Resp", String(format: "%.1f/min", resp), .cyan)
             }
         }
@@ -142,8 +133,8 @@ struct WatchRecoveryView: View {
     
     // MARK: - Advice Section (Action Layer)
     
-    private func adviceSection(_ score: RecoveryScore) -> some View {
-        let (text, icon, color) = trainingAdvice(score.overall)
+    private func adviceSection(_ score: RecoveryDataDTO) -> some View {
+        let (text, icon, color) = trainingAdvice(score.overallScore)
         
         return HStack(spacing: 12) {
             Image(systemName: icon)
@@ -160,58 +151,10 @@ struct WatchRecoveryView: View {
         .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
     }
     
-    // MARK: - Synced Score
     
-    private func syncedScoreView(_ s: Double) -> some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.25), lineWidth: 10)
-                
-                Circle()
-                    .trim(from: 0, to: s / 100)
-                    .stroke(
-                        scoreColor(s),
-                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                
-                Text("\(Int(s))")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-            }
-            .frame(width: 80, height: 80)
-            
-            Text(labelFor(s))
-                .font(.headline)
-                .foregroundStyle(scoreColor(s))
-            
-            let (text, icon, color) = trainingAdvice(s)
-            
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                Text(text)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(8)
-            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-            
-            Text("Synced from iPhone")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 8)
-    }
     
     // MARK: - Footer / Empty
     
-    private var footer: some View {
-        Text(source == .synced ? "Synced from iPhone" : "Live from HealthKit")
-            .font(.footnote)
-            .foregroundStyle(.tertiary)
-            .padding(.top, 4)
-    }
     
     private var emptyState: some View {
         ContentUnavailableView(
@@ -227,11 +170,11 @@ struct WatchRecoveryView: View {
     private func load() async {
         WatchConnectivityManager.shared.requestFullSync()
         
-        if let result = try? await RecoveryEngine().computeScore() {
-            score = result
-            source = .liveHK
-        }
+        let result = AppGroupDefaults.shared.loadAppContext()
         
+        if let data = result.recoveryData {
+            score = data
+        }
         isLoading = false
     }
     
@@ -268,34 +211,34 @@ struct WatchRecoveryView: View {
     }
 }
 
-#if DEBUG
-extension WatchRecoveryView {
-    /// For Preview Only
-    init(score: RecoveryScore) {
-        self._score = State(initialValue: score)
-        self._isLoading = State(initialValue: false)
-    }
-}
-
-#Preview {
-    let score = RecoveryScore(
-        overall: 75,
-        hrvContribution: 30,
-        metrics: RecoveryMetrics(
-            hrv: 42, restingHeartRate: 64,
-            sleepDuration: 8, sleepQualityPercent: 0.7,
-            respiratoryRate: 15, activeEnergyYesterday: 200,
-            activeEnergyTwoDaysAgo: 200
-        ),
-        dataQuality: .rich
-    )
-    
-    return NavigationStack {
-        WatchRecoveryView(score: score)
-    }
-}
-
-
-
-
-#endif
+//#if DEBUG
+//extension WatchRecoveryView {
+//    /// For Preview Only
+//    init(score: RecoveryScore) {
+//        self._score = State(initialValue: score)
+//        self._isLoading = State(initialValue: false)
+//    }
+//}
+//
+//#Preview {
+//    let score = RecoveryScore(
+//        overall: 75,
+//        hrvContribution: 30,
+//        metrics: RecoveryMetrics(
+//            hrv: 42, restingHeartRate: 64,
+//            sleepDuration: 8, sleepQualityPercent: 0.7,
+//            respiratoryRate: 15, activeEnergyYesterday: 200,
+//            activeEnergyTwoDaysAgo: 200
+//        ),
+//        dataQuality: .rich
+//    )
+//    
+//    return NavigationStack {
+//        WatchRecoveryView(score: score)
+//    }
+//}
+//
+//
+//
+//
+//#endif
