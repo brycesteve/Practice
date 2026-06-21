@@ -67,26 +67,48 @@ public extension ModelContainer {
             configurations: config
         )
         Task {
+            try await deduplicateProgressions(container: container)
             try await ensureDefaultProgressions(container: container)
         }
         return container
     }
     
-    @MainActor private static func ensureDefaultProgressions(container: ModelContainer) throws {
-        let desc = FetchDescriptor<SkillProgressionRecord>()
-        let progressions = try container.mainContext.fetch(desc)
-        let existingNames = Set(progressions.map { $0.skillName })
-        for def in SkillProgressions.defaultSkillProgressions {
-            if !existingNames.contains(def.skillName) {
-                container.mainContext.insert(SkillProgressionRecord(from: def))
-            }
-            else if let progression = progressions.first(where: { p in
-                p.skillName == def.skillName
-            }) {
-                progression.levels = def.levels
+    @MainActor
+    private static func deduplicateProgressions(container: ModelContainer) throws {
+        let records = try container.mainContext.fetch(FetchDescriptor<SkillProgressionRecord>())
+        
+        let grouped = Dictionary(grouping: records, by: { $0.skillName })
+        
+        for (_, duplicates) in grouped where duplicates.count > 1 {
+            let keeper = duplicates.max(by: { $0.currentLevel < $1.currentLevel })!
+            
+            for record in duplicates where record != keeper {
+                container.mainContext.delete(record)
             }
         }
-        try? container.mainContext.save()
+        try container.mainContext.save()
+    }
+    
+    @MainActor
+    private static func ensureDefaultProgressions(container: ModelContainer) throws {
+        let context = container.mainContext
+        let existing = try context.fetch(FetchDescriptor<SkillProgressionRecord>())
+        var byName: [String: SkillProgressionRecord] = Dictionary(
+            grouping: existing,
+            by: { $0.skillName }
+        )
+        .compactMapValues { $0.first }
+        
+        for def in SkillProgressions.defaultSkillProgressions {
+            if let existing = byName[def.skillName] {
+                existing.levels = def.levels
+            } else {
+                let newRecord = SkillProgressionRecord(from: def)
+                context.insert(newRecord)
+                byName[def.skillName] = newRecord
+            }
+        }
+        try context.save()
     }
     
     /// watchOS container — local only. WatchConnectivity is the sync bridge.

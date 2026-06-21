@@ -20,11 +20,12 @@ public struct RecoveryMetrics: Sendable {
     public var respiratoryRate: Double?        // breaths/min
     public var activeEnergyYesterday: Double?  // kcal
     public var activeEnergyTwoDaysAgo: Double? // kcal
+    public var sleepFragmentation: Double?
     
     public init(hrv: Double? = nil, restingHeartRate: Double? = nil,
                 sleepDuration: Double? = nil, sleepQualityPercent: Double? = nil,
                 respiratoryRate: Double? = nil, activeEnergyYesterday: Double? = nil,
-                activeEnergyTwoDaysAgo: Double? = nil) {
+                activeEnergyTwoDaysAgo: Double? = nil, sleepFragmentation: Double? = nil) {
         self.hrv = hrv
         self.restingHeartRate = restingHeartRate
         self.sleepDuration = sleepDuration
@@ -32,6 +33,7 @@ public struct RecoveryMetrics: Sendable {
         self.respiratoryRate = respiratoryRate
         self.activeEnergyYesterday = activeEnergyYesterday
         self.activeEnergyTwoDaysAgo = activeEnergyTwoDaysAgo
+        self.sleepFragmentation = sleepFragmentation
     }
 }
 
@@ -143,7 +145,8 @@ public actor RecoveryEngine {
             sleepQualityPercent: sleepResult.qualityPercent,
             respiratoryRate: respVal,
             activeEnergyYesterday: e1,
-            activeEnergyTwoDaysAgo: e2
+            activeEnergyTwoDaysAgo: e2,
+            sleepFragmentation: sleepResult.interruptionCount != nil ? Double(sleepResult.interruptionCount!) : nil
         )
     }
     
@@ -250,7 +253,7 @@ public actor RecoveryEngine {
                     let last = samplesByDay[key]!.last!
                     
                     // Allow small gaps (5 min) to keep session contiguous
-                    if sample.endDate >= last.startDate.addingTimeInterval(-300) {
+                    if sample.endDate >= last.startDate.addingTimeInterval(-7200) {
                         samplesByDay[key]!.append(sample)
                     } else {
                         break
@@ -267,7 +270,7 @@ public actor RecoveryEngine {
                         .map { $0.1.timeIntervalSince($0.0) }
                         .reduce(0, +)
                     
-                    byDay[date] = totalSleep
+                    byDay[date] = totalSleep / 3600
                 }
                 
                 continuation.resume(returning: Array(byDay.values))
@@ -281,6 +284,12 @@ public actor RecoveryEngine {
         return Baseline(mean: mean, stdDev: stdDev)
     }
     
+    private func bellCurveScore(_ value: Double, ideal: Double, tolerance: Double) -> Double {
+        let diff = abs(value - ideal)
+        let normalized = diff / tolerance
+        let score = 100 * exp(-pow(normalized, 2))
+        return max(0, min(100, score))
+    }
     
     // MARK: - Score calculation
     
@@ -322,8 +331,30 @@ public actor RecoveryEngine {
         
         var sleepQC: Double? = nil
         if let quality = m.sleepQualityPercent {
-            let s = clamp(normalize(quality, low: 10, mid: 25, high: 40), 0, 100)
-            sleepQC = s; components.append((s, 0.15))
+            // 1. Base architecture score (non-saturating)
+            var score = bellCurveScore(quality, ideal: 40, tolerance: 15)
+            
+            // 2. Fragmentation penalty
+            let fragmentationPenalty = min(25, (m.sleepFragmentation ?? 0) * 5)
+            score -= fragmentationPenalty
+            
+            // 3. HRV coupling (recovery confirmation)
+            if let hrv = m.hrv {
+                let hrvBonus = clamp((hrv - 45) / 35 * 10, 0, 10)
+                score += hrvBonus
+            }
+            
+            // 4. Resting HR penalty (stress signal)
+            if let rhr = m.restingHeartRate {
+                let rhrPenalty = clamp((rhr - 60) / 20 * 10, 0, 10)
+                score -= rhrPenalty
+            }
+            
+            // 5. Clamp final result
+            score = clamp(score, 0, 100)
+            
+            sleepQC = score
+            components.append((score, 0.15))
         }
         
         var respC: Double? = nil
@@ -374,104 +405,6 @@ public actor RecoveryEngine {
         var respiratoryRate: Baseline?
     }
     
-//    private func score(from m: RecoveryMetrics) -> RecoveryScore {
-//        var components: [(score: Double, weight: Double)] = []
-//        
-//        // HRV (30%) — score using population norms: <20ms poor, 20–50ms average, >80ms excellent
-//        var hrvC: Double? = nil
-//        if let hrv = m.hrv {
-//            let s = clamp(normalize(hrv, low: 15, mid: 40, high: 80), 0, 100)
-//            hrvC = s
-//            components.append((s, 0.30))
-//        }
-//        
-//        // Resting HR (20%) — lower is better; <50 excellent, 50–70 normal, >85 poor
-//        var rhrC: Double? = nil
-//        if let rhr = m.restingHeartRate {
-//            let s = clamp(normalize(100 - rhr, low: 15, mid: 30, high: 50), 0, 100)
-//            rhrC = s
-//            components.append((s, 0.20))
-//        }
-//        
-//        // Sleep Duration (20%) — target 7.5–9h; <5h or >10h penalised
-//        var sleepDurC: Double? = nil
-//        if let hours = m.sleepDuration {
-//            let s: Double
-//            switch hours {
-//            case 0..<4:    s = 5
-//            case 4..<5.5:  s = 30
-//            case 5.5..<6.5:s = 55
-//            case 6.5..<7:  s = 72
-//            case 7..<9.5:  s = 100
-//            case 9.5..<11: s = 80
-//            default:       s = 60
-//            }
-//            sleepDurC = s
-//            components.append((s, 0.20))
-//        }
-//        
-//        // Sleep Quality (15%) — % time in deep + REM
-//        var sleepQC: Double? = nil
-//        if let quality = m.sleepQualityPercent {
-//            // 40%+ is excellent, <15% is poor
-//            let s = clamp(normalize(quality, low: 10, mid: 25, high: 40), 0, 100)
-//            sleepQC = s
-//            components.append((s, 0.15))
-//        }
-//        
-//        // Respiratory Rate (5%) — normal ~12–20; elevated = stress
-//        var respC: Double? = nil
-//        if let resp = m.respiratoryRate {
-//            let s: Double
-//            switch resp {
-//            case 0..<12:   s = 70   // low is unusual but not necessarily bad
-//            case 12..<16:  s = 100
-//            case 16..<18:  s = 85
-//            case 18..<20:  s = 65
-//            default:       s = 35   // elevated
-//            }
-//            respC = s
-//            components.append((s, 0.05))
-//        }
-//        
-//        // Training Load (10%) — recent heavy energy spend = less recovery capacity
-//        var loadC: Double? = nil
-//        let totalLoad = (m.activeEnergyYesterday ?? 0) + (m.activeEnergyTwoDaysAgo ?? 0) * 0.5
-//        if m.activeEnergyYesterday != nil || m.activeEnergyTwoDaysAgo != nil {
-//            // <300kcal combined = fully rested, >1200kcal = heavy load
-//            let s = clamp(100 - normalize(totalLoad, low: 200, mid: 700, high: 1200), 0, 100)
-//            loadC = s
-//            components.append((s, 0.10))
-//        }
-//        
-//        // Weighted average, re-normalised if some metrics missing
-//        let totalWeight = components.map(\.weight).reduce(0, +)
-//        let weighted: Double
-//        if totalWeight == 0 {
-//            weighted = 50   // no data: neutral score
-//        } else {
-//            weighted = components.map { $0.score * ($0.weight / totalWeight) }.reduce(0, +)
-//        }
-//        
-//        let quality: RecoveryScore.DataQuality
-//        switch components.count {
-//        case 4...: quality = .rich
-//        case 2...3: quality = .moderate
-//        default: quality = .limited
-//        }
-//        
-//        return RecoveryScore(
-//            overall: weighted.rounded(),
-//            hrvContribution: hrvC,
-//            restingHRContribution: rhrC,
-//            sleepDurationContribution: sleepDurC,
-//            sleepQualityContribution: sleepQC,
-//            respiratoryContribution: respC,
-//            trainingLoadContribution: loadC,
-//            metrics: m,
-//            dataQuality: quality
-//        )
-//    }
     
     // MARK: - HealthKit queries
     
@@ -499,6 +432,7 @@ public actor RecoveryEngine {
     private struct SleepResult: Sendable {
         var hours: Double?
         var qualityPercent: Double?
+        var interruptionCount: Int?
     }
     
     private func fetchLastNightSleep() async throws -> SleepResult {
@@ -517,7 +451,10 @@ public actor RecoveryEngine {
                 predicate: predicate,
                 limit: HKObjectQueryNoLimit,
                 sortDescriptors: [sort]
-            ) { _, samples, error in
+            ) {
+ _,
+ samples,
+ error in
                 if let error {
                     continuation.resume(throwing: error)
                     return
@@ -544,7 +481,8 @@ public actor RecoveryEngine {
                     var result: [(Date, Date)] = []
                     
                     for interval in sorted {
-                        if let last = result.last, interval.0 <= last.1 {
+                        if let last = result.last,
+ interval.0 <= last.1 {
                             result[result.count - 1].1 = max(last.1, interval.1)
                         } else {
                             result.append(interval)
@@ -570,15 +508,24 @@ public actor RecoveryEngine {
                     let last = session.last!
                     
                     // Allow small gaps (5 min) to keep session contiguous
-                    if sample.endDate >= last.startDate.addingTimeInterval(-300) {
+                    if sample.endDate >= last.startDate.addingTimeInterval(-7200) {
                         session.append(sample)
                     } else {
                         break
                     }
                 }
                 
+                let interruptionCount = max(0, session.count / 3)
+                
                 guard !session.isEmpty else {
-                    continuation.resume(returning: SleepResult(hours: nil, qualityPercent: nil))
+                    continuation
+                        .resume(
+                            returning: SleepResult(
+                                hours: nil,
+                                qualityPercent: nil,
+                                interruptionCount: nil
+                            )
+                        )
                     return
                 }
                 
@@ -615,7 +562,8 @@ public actor RecoveryEngine {
                 continuation.resume(
                     returning: SleepResult(
                         hours: hours,
-                        qualityPercent: qualityPercent
+                        qualityPercent: qualityPercent,
+                        interruptionCount: interruptionCount
                     )
                 )
             }

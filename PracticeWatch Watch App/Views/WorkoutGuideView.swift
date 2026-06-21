@@ -28,22 +28,63 @@ private final class AudioCue: NSObject, AVSpeechSynthesizerDelegate {
     static let shared = AudioCue()
     private let synth = AVSpeechSynthesizer()
     private let voice: AVSpeechSynthesisVoice?
+    private var audioSessionConfigured = false
+    
     override init() {
-        self.voice = AVSpeechSynthesisVoice.speechVoices().filter({$0.language == "en-GB" && $0.gender == .female}).first
-        super.init();
+        self.voice = Self.preferredVoice()
+        super.init()
         synth.delegate = self
     }
     
     func speak(_ text: String) {
-        // Only speak during active workout — respects silent mode on watch
-        let utt = AVSpeechUtterance(string: text)
-        if voice != nil {
-            utt.voice = voice
-        }
-        utt.rate = AVSpeechUtteranceDefaultSpeechRate * 1.1
-        utt.volume = 0.8
-        synth.speak(utt)
+        configureAudioSessionIfNeeded()
+        
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = voice
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.1
+        utterance.volume = 1.0
+        synth.speak(utterance)
     }
+    
+    private func configureAudioSessionIfNeeded() {
+        guard !audioSessionConfigured else { return }
+        audioSessionConfigured = true
+        
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            audioSessionConfigured = false
+        }
+    }
+    
+    private static func preferredVoice() -> AVSpeechSynthesisVoice? {
+        let englishVoices = AVSpeechSynthesisVoice.speechVoices()
+            .filter { $0.language.hasPrefix("en-") }
+        guard !englishVoices.isEmpty else {
+            return AVSpeechSynthesisVoice(language: "en-GB")
+        }
+        
+        return englishVoices.max { voiceScore($0) < voiceScore($1) }
+    }
+    
+    private static func voiceScore(_ voice: AVSpeechSynthesisVoice) -> Int {
+        var score = 0
+        
+        if voice.language == "en-GB" { score += 300 }
+        if voice.gender == .female { score += 1_000 }
+        if likelyFemaleVoiceNames.contains(voice.name) { score += 900 }
+        if voice.identifier.localizedCaseInsensitiveContains("female") { score += 900 }
+        if voice.quality == .premium { score += 40 }
+        if voice.quality == .enhanced { score += 20 }
+        
+        return score
+    }
+    
+    private static let likelyFemaleVoiceNames: Set<String> = [
+        "Ava", "Fiona", "Karen", "Kate", "Martha", "Moira", "Samantha", "Serena", "Tessa", "Victoria"
+    ]
 }
 
 // MARK: - Category tint
@@ -482,16 +523,17 @@ struct WorkoutGuideView: View {
         scrollToTop()
         
         let completedRound = position.round
-        let isLastRound    = completedRound >= step.sets
+        let nextPosition = computeNextPosition(after: step, completing: completedRound)
+        let hasNextExercise = nextPosition.phase != .done
         
         if step.isHRGated {
-            if !isLastRound { position.phase = .hrRest }
-            else            { moveToNextStep(from: step) }
+            if hasNextExercise { position.phase = .hrRest }
+            else               { advancePosition(completedRound: completedRound, step: step) }
         } else if isLastRoundOfCircuit(step: step, round: completedRound) {
             let rest = circuitEndRest(for: step)
-            if rest > 0 && !isLastRound { startRestTimer(seconds: rest, step: step) }
-            else                        { advancePosition(completedRound: completedRound, step: step) }
-        } else if step.restSeconds > 0 {
+            if rest > 0 && hasNextExercise { startRestTimer(seconds: rest, step: step) }
+            else                           { advancePosition(completedRound: completedRound, step: step) }
+        } else if step.restSeconds > 0 && hasNextExercise {
             startRestTimer(seconds: step.restSeconds, step: step)
         } else {
             advancePosition(completedRound: completedRound, step: step)
