@@ -6,6 +6,8 @@ import SwiftData
 struct SessionPickerView: View {
     @Environment(ErrorState.self) private var errorState
     @State private var settings = AppGroupDefaults.shared.loadAppContext()
+    @State private var activeWorkout = WatchActiveWorkoutStore.shared
+    @State private var sessionManager = WorkoutSessionManager.shared
     
     private var isRestDayToday: Bool {
         settings.restDays.contains { Calendar.current.isDateInToday($0) }
@@ -20,6 +22,12 @@ struct SessionPickerView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
+                    if sessionManager.isRunning, let activePlan = activeWorkout.activePlan {
+                        NavigationLink(destination: WorkoutGuideView(plan: activePlan)) {
+                            resumeTile(for: activePlan)
+                        }
+                        .buttonStyle(.plain)
+                    }
                     
                     // MARK: - Session Tiles
                     ForEach(SessionType.allCases, id: \ .self) { type in
@@ -27,6 +35,8 @@ struct SessionPickerView: View {
                             sessionTile(for: type)
                         }
                         .buttonStyle(.plain)
+                        .disabled(sessionManager.isRunning)
+                        .opacity(sessionManager.isRunning ? 0.45 : 1)
                     }
                     
                     // MARK: - Secondary Actions
@@ -75,12 +85,41 @@ struct SessionPickerView: View {
                 WorkoutGuideView(plan: plan(for: type))
             }
             .onAppear {
+                settings = AppGroupDefaults.shared.loadAppContext()
                 requestSyncIfNeeded()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .syncPayloadReceived)) { _ in
+                settings = AppGroupDefaults.shared.loadAppContext()
             }
         }
     }
     
     // MARK: - Session Tile
+    
+    @ViewBuilder
+    private func resumeTile(for plan: SessionPlan) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "figure.run.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.green)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Resume Workout")
+                    .font(.caption).fontWeight(.semibold)
+                Text("\(plan.sessionType.displayName) · \(formatDuration(sessionManager.elapsedSeconds))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.green.opacity(0.24))
+        )
+    }
     
     @ViewBuilder
     private func sessionTile(for type: SessionType) -> some View {
@@ -186,6 +225,17 @@ struct SessionPickerView: View {
     
     private func requestSyncIfNeeded() {
         WatchConnectivityManager.shared.requestFullSync()
+    }
+    
+    private func formatDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let remainingSeconds = seconds % 60
+        
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 }
 

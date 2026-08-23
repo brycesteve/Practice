@@ -167,25 +167,25 @@ struct ConditioningView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Weekly Trend").font(.headline)
 
+            let recent = Array(history.prefix(12).reversed())
             Chart {
-                ForEach(history.prefix(12).reversed()) { record in
+                ForEach(recent) { record in
                     LineMark(
                         x: .value("Week", record.date, unit: .weekOfYear),
                         y: .value("Score", record.overallScore)
                     )
                     .foregroundStyle(Color.accentColor)
                     .lineStyle(StrokeStyle(lineWidth: 2))
-                    .interpolationMethod(.monotone)
-                    .symbol(.circle)
-                    .symbolSize(30)
-
-                    AreaMark(
+                    .interpolationMethod(.linear)
+                }
+                
+                ForEach(recent) { record in
+                    PointMark(
                         x: .value("Week", record.date, unit: .weekOfYear),
-                        yStart: .value("Base", 0),
-                        yEnd:   .value("Score", record.overallScore)
+                        y: .value("Score", record.overallScore)
                     )
-                    .foregroundStyle(Color.accentColor.opacity(0.12))
-                    .interpolationMethod(.monotone)
+                    .symbolSize(35)
+                    .foregroundStyle(Color.accentColor)
                 }
 
                 // 50 = steady line

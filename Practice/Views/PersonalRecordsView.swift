@@ -209,11 +209,11 @@ struct PersonalRecordsView: View {
 
     @ViewBuilder
     private func skillBestRow(record: SkillProgressionRecord) -> some View {
-        let history = skillHistory.filter { $0.skillProgressionID == record.id }
+        let sets = skillSetValues(for: record)
 
         // Best hold (timed) or best total reps across all sessions
-        let bestHold = history.flatMap { $0.sets ?? [] }.compactMap(\.durationSeconds).max()
-        let bestReps = history.flatMap { $0.sets ?? [] }.compactMap(\.reps).max()
+        let bestHold = sets.compactMap(\.durationSeconds).max()
+        let bestReps = sets.compactMap(\.reps).max()
 
         if let hold = bestHold {
             PRRow(
@@ -239,6 +239,22 @@ struct PersonalRecordsView: View {
                 Text("No sessions yet").font(.caption).foregroundStyle(.tertiary)
             }
         }
+    }
+
+    private func skillSetValues(for record: SkillProgressionRecord) -> [(reps: Int?, durationSeconds: Int?)] {
+        let historySets = skillHistory
+            .filter { $0.skillProgressionID == record.id }
+            .flatMap { $0.sets ?? [] }
+            .map { (reps: $0.reps, durationSeconds: $0.durationSeconds) }
+        
+        guard historySets.isEmpty else { return historySets }
+        
+        let levelNames = Set(record.levels.map(\.name))
+        return workouts
+            .flatMap { $0.exercises ?? [] }
+            .filter { levelNames.contains($0.exerciseName) }
+            .flatMap { $0.sets ?? [] }
+            .map { (reps: $0.reps, durationSeconds: $0.durationSeconds) }
     }
 
     // MARK: - Load health peaks

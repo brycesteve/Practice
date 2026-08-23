@@ -167,11 +167,8 @@ public final class HealthKitManager: NSObject, Sendable {
     
     private func fetchLatestQuantitySample(_ id: HKQuantityTypeIdentifier, unit: HKUnit) async throws -> Double? {
         let type = HKQuantityType(id)
-        let now = Date()
-        let start = Calendar.current.date(byAdding: .day, value: -30, to: now)!
-        let predicate = HKQuery.predicateForSamples(withStart: start, end: now)
         return try await withCheckedThrowingContinuation { continuation in
-            let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: 1,
+            let query = HKSampleQuery(sampleType: type, predicate: nil, limit: 1,
                                       sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]) { _, samples, error in
                 if let error { continuation.resume(throwing: error); return }
                 let value = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: unit)
@@ -227,6 +224,8 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     
     // Live metrics
     public var heartRate: Double = 0
+    public var averageHeartRate: Double = 0
+    public var peakHeartRate: Double = 0
     public var activeCalories: Double = 0
     public var elapsedSeconds: Int = 0
     public var isRunning: Bool = false
@@ -234,10 +233,14 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     
     private var timer: Timer?
     private var sessionStartDate: Date?
+    private var heartRateSampleTotal: Double = 0
+    private var heartRateSampleCount: Int = 0
     
     // MARK: - Start
     
     public func startWorkout(activityType: HKWorkoutActivityType) async throws {
+        resetLiveMetrics()
+        
         let config = HKWorkoutConfiguration()
         config.activityType = activityType
         config.locationType = .indoor
@@ -290,13 +293,30 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         stopTimer()
         isRunning = false
         isPaused = false
+        self.session = nil
+        self.builder = nil
         
         return workout?.uuid
     }
     
     // MARK: - Timer
     
+    private func resetLiveMetrics() {
+        stopTimer()
+        heartRate = 0
+        averageHeartRate = 0
+        peakHeartRate = 0
+        activeCalories = 0
+        elapsedSeconds = 0
+        isRunning = false
+        isPaused = false
+        sessionStartDate = nil
+        heartRateSampleTotal = 0
+        heartRateSampleCount = 0
+    }
+    
     private func startTimer() {
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.elapsedSeconds += 1
@@ -341,7 +361,12 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
                 switch quantityType {
                 case HKQuantityType(.heartRate):
                     let hrUnit = HKUnit.count().unitDivided(by: .minute())
-                    self.heartRate = stats?.mostRecentQuantity()?.doubleValue(for: hrUnit) ?? self.heartRate
+                    guard let latestHeartRate = stats?.mostRecentQuantity()?.doubleValue(for: hrUnit) else { break }
+                    self.heartRate = latestHeartRate
+                    self.peakHeartRate = max(self.peakHeartRate, latestHeartRate)
+                    self.heartRateSampleTotal += latestHeartRate
+                    self.heartRateSampleCount += 1
+                    self.averageHeartRate = self.heartRateSampleTotal / Double(self.heartRateSampleCount)
                     
                 case HKQuantityType(.activeEnergyBurned):
                     let calUnit = HKUnit.kilocalorie()

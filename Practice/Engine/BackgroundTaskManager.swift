@@ -165,6 +165,7 @@ public final class BackgroundTaskManager {
             record.restingHRScore        = result.restingHRContribution
             record.sleepDurationScore    = result.sleepDurationContribution
             record.sleepQualityScore     = result.sleepQualityContribution
+            record.sleepQualityPercent   = result.metrics.sleepQualityPercent
             record.respiratoryRateScore  = result.respiratoryContribution
             record.trainingLoadScore     = result.trainingLoadContribution
             record.hrv                   = result.metrics.hrv

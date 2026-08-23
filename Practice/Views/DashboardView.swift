@@ -6,12 +6,15 @@ import SwiftData
 import Charts
 
 struct DashboardView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var allWorkouts: [WorkoutRecord]
     @Query private var progressionRecords: [SkillProgressionRecord]
     @Query private var settingsResults: [AppSettings]
     @Query private var restDays: [RestDayRecord]
     @Query(sort: \ConditioningScoreRecord.date, order: .reverse)
     private var conditioningHistory: [ConditioningScoreRecord]
+    @Query(sort: \RecoveryScoreRecord.date, order: .reverse)
+    private var recoveryHistory: [RecoveryScoreRecord]
     
     @State private var latestWeightKg: Double? = nil
     @State private var latestVO2Max: Double?   = nil
@@ -83,12 +86,10 @@ struct DashboardView: View {
                 .padding(.vertical)
                 .task {
                     async let weight = HealthKitManager.shared.fetchLatestBodyMass()
-                    async let vo2    = HealthKitManager.shared.fetchLatestVO2Max()
-                    async let score  = RecoveryEngine().computeScore()
+                    async let vo2 = HealthKitManager.shared.fetchLatestVO2Max()
                     latestWeightKg = try? await weight
-                    latestVO2Max   = try? await vo2
-                    recoveryScore  = try? await score
-                    latestVO2Max   = try? await HealthKitManager.shared.fetchLatestVO2Max()
+                    latestVO2Max = try? await vo2
+                    await loadCachedRecoveryScore()
                 }
             }
             .navigationTitle("Dashboard")
@@ -109,6 +110,53 @@ struct DashboardView: View {
             }
         }
         
+    }
+    
+    @MainActor
+    private func loadCachedRecoveryScore() async {
+        let today = Calendar.current.startOfDay(for: Date())
+        let todayRecord = recoveryHistory.first { Calendar.current.isDate($0.date, inSameDayAs: today) }
+        let cacheIsFresh = todayRecord.map { Date().timeIntervalSince($0.date) < 2 * 3600 } ?? false
+        
+        if !cacheIsFresh {
+            await BackgroundTaskManager.shared.computeAndCacheScore(modelContainer: modelContext.container)
+        }
+        
+        let fetchedRecords = (try? modelContext.fetch(FetchDescriptor<RecoveryScoreRecord>())) ?? []
+        guard let record = (recoveryHistory + fetchedRecords).first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) else {
+            recoveryScore = nil
+            return
+        }
+        
+        recoveryScore = RecoveryScore(
+            overall: record.overallScore,
+            hrvContribution: record.hrvScore,
+            restingHRContribution: record.restingHRScore,
+            sleepDurationContribution: record.sleepDurationScore,
+            sleepQualityContribution: record.sleepQualityScore,
+            respiratoryContribution: record.respiratoryRateScore,
+            trainingLoadContribution: record.trainingLoadScore,
+            metrics: RecoveryMetrics(
+                hrv: record.hrv,
+                restingHeartRate: record.restingHR,
+                sleepDuration: record.sleepHours,
+                sleepQualityPercent: record.sleepQualityPercent,
+                respiratoryRate: record.respiratoryRate,
+                activeEnergyYesterday: record.activeEnergyYesterday
+            ),
+            dataQuality: recoveryDataQuality(from: record)
+        )
+    }
+    
+    private func recoveryDataQuality(from record: RecoveryScoreRecord) -> RecoveryScore.DataQuality {
+        let count = [record.hrv, record.restingHR, record.sleepHours, record.sleepQualityPercent, record.respiratoryRate]
+            .compactMap { $0 }
+            .count
+        switch count {
+        case 4...: return .rich
+        case 2...3: return .moderate
+        default: return .limited
+        }
     }
     
     // MARK: - Subviews

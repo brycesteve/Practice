@@ -443,6 +443,12 @@ enum TrainingSchemaV1: VersionedSchema {
         public var id: UUID = UUID()
         public var targetSwingWeightKg: Double = 32
         public var targetTGUWeightKg: Double = 32
+        public var currentSwingWeightKg: Double = 24
+        public var currentTGUWeightKg: Double = 24
+        public var swingProgressionWeightKg: Double = 28
+        public var tguProgressionWeightKg: Double = 28
+        public var swingProgressionSetCount: Int = 0
+        public var tguProgressionSetCount: Int = 0
         public var eveningRotationDay: Int = 0
         public var notificationsEnabled: Bool = true
         public var morningReminderHour: Int = 5
@@ -471,6 +477,7 @@ enum TrainingSchemaV1: VersionedSchema {
         public var restingHRScore: Double? = nil
         public var sleepDurationScore: Double? = nil
         public var sleepQualityScore: Double? = nil
+        public var sleepQualityPercent: Double? = nil
         public var respiratoryRateScore: Double? = nil
         public var trainingLoadScore: Double? = nil
         public var hrv: Double? = nil
@@ -502,6 +509,7 @@ enum TrainingSchemaV1: VersionedSchema {
             dto.restingHRScore = self.restingHRScore
             dto.sleepDurationScore = self.sleepDurationScore
             dto.sleepQualityScore = self.sleepQualityScore
+            dto.sleepQualityPercent = self.sleepQualityPercent
             dto.respiratoryRateScore = self.respiratoryRateScore
             dto.trainingLoadScore = self.trainingLoadScore
             dto.hrv = self.hrv

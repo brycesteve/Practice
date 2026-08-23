@@ -25,17 +25,47 @@ struct ProgressionView: View {
     }
 }
 
+// MARK: - Shared history lookup
+
+private func skillHistoryEntries(
+    for record: SkillProgressionRecord,
+    allHistory: [SkillSessionRecord],
+    workouts: [WorkoutRecord]
+) -> [SkillSessionEntry] {
+    let directHistory = allHistory
+        .filter { $0.skillProgressionID == record.id }
+        .map { $0.toSkillSessionEntry() }
+        .sorted { $0.date < $1.date }
+    
+    guard directHistory.isEmpty else { return directHistory }
+    
+    let levelByName = Dictionary(uniqueKeysWithValues: record.levels.map { ($0.name, $0.level) })
+    return workouts
+        .flatMap { workout in
+            workout.exercisesSorted.compactMap { exercise -> SkillSessionEntry? in
+                guard let level = levelByName[exercise.exerciseName] else { return nil }
+                let sets = exercise.setsSorted.map { $0.toCompletedSet() }
+                guard !sets.isEmpty else { return nil }
+                return SkillSessionEntry(
+                    date: workout.startDate,
+                    skillProgressionID: record.id,
+                    level: level,
+                    sets: sets
+                )
+            }
+        }
+        .sorted { $0.date < $1.date }
+}
+
 // MARK: - Row
 
 struct SkillRowView: View {
     let record: SkillProgressionRecord
     @Query private var allHistory: [SkillSessionRecord]
+    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
     
     private var history: [SkillSessionEntry] {
-        allHistory
-            .filter { $0.skillProgressionID == record.id }
-            .map    { $0.toSkillSessionEntry() }
-            .sorted { $0.date < $1.date }
+        skillHistoryEntries(for: record, allHistory: allHistory, workouts: workouts)
     }
     
     private var recommendation: ProgressionRecommendation {
@@ -84,12 +114,10 @@ struct SkillDetailView: View {
     let record: SkillProgressionRecord
     @Environment(\.modelContext) private var modelContext
     @Query private var allHistory: [SkillSessionRecord]
+    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
     
     private var history: [SkillSessionEntry] {
-        allHistory
-            .filter { $0.skillProgressionID == record.id }
-            .map    { $0.toSkillSessionEntry() }
-            .sorted { $0.date < $1.date }
+        skillHistoryEntries(for: record, allHistory: allHistory, workouts: workouts)
     }
     
     private var progression: SkillProgression { record.toSkillProgression() }

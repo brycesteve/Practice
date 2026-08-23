@@ -177,6 +177,11 @@ struct SetRow: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showEdit = false
     
+    private var showsDifficulty: Bool {
+        guard let exercise = set.exercise else { return false }
+        return exercise.skillLevel != nil
+    }
+    
     var body: some View {
         HStack {
             if let side = set.tguSide {
@@ -189,7 +194,9 @@ struct SetRow: View {
             Spacer()
             if let r = set.reps            { Text("\(r) reps").font(.caption) }
             if let d = set.durationSeconds { Text("\(d)s").font(.caption)     }
-            Text(set.feltDifficulty.emoji)
+            if showsDifficulty {
+                Text(set.feltDifficulty.emoji)
+            }
             
             Image(systemName: "pencil")
                 .font(.system(size: 10))
@@ -216,6 +223,10 @@ struct EditSetSheet: View {
     @State private var difficulty: DifficultyRating
     
     private var isTimed: Bool { self.set.durationSeconds != nil }
+    private var showsDifficulty: Bool {
+        guard let exercise = set.exercise else { return false }
+        return exercise.skillLevel != nil
+    }
     
     init(set: SetRecord) {
         self.set = set
@@ -234,10 +245,12 @@ struct EditSetSheet: View {
                         Stepper("Reps: \(reps)", value: $reps, in: 0...200, step: 1)
                     }
                 }
-                Section("Effort") {
-                    Picker("Difficulty", selection: $difficulty) {
-                        ForEach(DifficultyRating.allCases, id: \.self) { d in
-                            Label("\(d.emoji) \(d.label)", systemImage: "").tag(d)
+                if showsDifficulty {
+                    Section("Effort") {
+                        Picker("Difficulty", selection: $difficulty) {
+                            ForEach(DifficultyRating.allCases, id: \.self) { d in
+                                Label("\(d.emoji) \(d.label)", systemImage: "").tag(d)
+                            }
                         }
                     }
                 }

@@ -6,6 +6,7 @@ import SwiftData
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var settingsResults: [AppSettings]
+    @Query private var progressionRecords: [SkillProgressionRecord]
     
     private var settings: AppSettings {
         if let s = settingsResults.first { return s }
@@ -57,7 +58,7 @@ struct SettingsView: View {
                                     Text("Swing (kg)").font(.caption2)
                                     Picker("", selection: Binding(
                                         get: { settings.targetSwingWeightKg },
-                                        set: { settings.targetSwingWeightKg = $0 }
+                                        set: { settings.targetSwingWeightKg = $0; persistSettings(pushSync: true) }
                                     )) {
                                         ForEach(
                                             WorkoutData.kbWeights,
@@ -73,7 +74,7 @@ struct SettingsView: View {
                                     Text("TGU (kg)").font(.caption2)
                                     Picker("", selection: Binding(
                                         get: { settings.targetTGUWeightKg },
-                                        set: { settings.targetTGUWeightKg = $0 }
+                                        set: { settings.targetTGUWeightKg = $0; persistSettings(pushSync: true) }
                                     )) {
                                         ForEach(
                                             WorkoutData.kbWeights,
@@ -91,11 +92,47 @@ struct SettingsView: View {
                     Label("S&S Targets", systemImage: "flag.checkered")
                 }
                 
+                Section {
+                    kettlebellPlanRow(
+                        title: "Swings",
+                        currentWeight: Binding(
+                            get: { settings.currentSwingWeightKg },
+                            set: { settings.currentSwingWeightKg = $0; persistSettings(pushSync: true) }
+                        ),
+                        progressionWeight: Binding(
+                            get: { settings.swingProgressionWeightKg },
+                            set: { settings.swingProgressionWeightKg = $0; persistSettings(pushSync: true) }
+                        ),
+                        progressionSets: Binding(
+                            get: { evenProgressionSetCount(settings.swingProgressionSetCount) },
+                            set: { settings.swingProgressionSetCount = evenProgressionSetCount($0); persistSettings(pushSync: true) }
+                        )
+                    )
+                    
+                    kettlebellPlanRow(
+                        title: "Turkish Get-Ups",
+                        currentWeight: Binding(
+                            get: { settings.currentTGUWeightKg },
+                            set: { settings.currentTGUWeightKg = $0; persistSettings(pushSync: true) }
+                        ),
+                        progressionWeight: Binding(
+                            get: { settings.tguProgressionWeightKg },
+                            set: { settings.tguProgressionWeightKg = $0; persistSettings(pushSync: true) }
+                        ),
+                        progressionSets: Binding(
+                            get: { evenProgressionSetCount(settings.tguProgressionSetCount) },
+                            set: { settings.tguProgressionSetCount = evenProgressionSetCount($0); persistSettings(pushSync: true) }
+                        )
+                    )
+                } header: {
+                    Label("Kettlebell Working Weights", systemImage: "scalemass")
+                }
+                
                 // MARK: Notifications
                 Section {
                     Toggle("Enable Reminders", isOn: Binding(
                         get: { settings.notificationsEnabled },
-                        set: { settings.notificationsEnabled = $0; updateNotifications() }
+                        set: { settings.notificationsEnabled = $0; persistSettings(); updateNotifications() }
                     ))
                     
                     if settings.notificationsEnabled && notificationsGranted {
@@ -161,22 +198,87 @@ struct SettingsView: View {
                 case "men":
                     settings.targetSwingWeightKg = AppSettings.menSimple.swing
                     settings.targetTGUWeightKg   = AppSettings.menSimple.tgu
+                    persistSettings(pushSync: true)
                 case "women":
                     settings.targetSwingWeightKg = AppSettings.womenSimple.swing
                     settings.targetTGUWeightKg   = AppSettings.womenSimple.tgu
+                    persistSettings(pushSync: true)
                 default: break
                 }
             }
         )
     }
     
+    private func persistSettings(pushSync: Bool = false) {
+        settings.swingProgressionSetCount = evenProgressionSetCount(settings.swingProgressionSetCount)
+        settings.tguProgressionSetCount = evenProgressionSetCount(settings.tguProgressionSetCount)
+        try? modelContext.save()
+        AppGroupDefaults.shared.updateKettlebellTargets(
+            swing: settings.targetSwingWeightKg,
+            tgu: settings.targetTGUWeightKg
+        )
+        AppGroupDefaults.shared.updateKettlebellPlan(
+            currentSwing: settings.currentSwingWeightKg,
+            currentTGU: settings.currentTGUWeightKg,
+            progressionSwing: settings.swingProgressionWeightKg,
+            progressionTGU: settings.tguProgressionWeightKg,
+            swingProgressionSets: settings.swingProgressionSetCount,
+            tguProgressionSets: settings.tguProgressionSetCount
+        )
+        
+        if pushSync {
+            var payload = AppGroupDefaults.shared.loadAppContext()
+            payload.skillProgressions = progressionRecords.map { $0.toSkillProgression() }
+            payload.targetSwingWeightKg = settings.targetSwingWeightKg
+            payload.targetTGUWeightKg = settings.targetTGUWeightKg
+            payload.currentSwingWeightKg = settings.currentSwingWeightKg
+            payload.currentTGUWeightKg = settings.currentTGUWeightKg
+            payload.swingProgressionWeightKg = settings.swingProgressionWeightKg
+            payload.tguProgressionWeightKg = settings.tguProgressionWeightKg
+            payload.swingProgressionSetCount = settings.swingProgressionSetCount
+            payload.tguProgressionSetCount = settings.tguProgressionSetCount
+            AppGroupDefaults.shared.saveAppContext(payload)
+            WatchConnectivityManager.shared.sendFullSync(payload: payload)
+        }
+    }
+    
     private func updateNotifications() {
+        persistSettings()
         guard settings.notificationsEnabled else {
             NotificationManager.shared.cancelAllReminders()
             return
         }
         NotificationManager.shared.scheduleMorningReminder(hour: settings.morningReminderHour, minute: settings.morningReminderMinute)
         NotificationManager.shared.scheduleEveningReminder(hour: settings.eveningReminderHour, minute: settings.eveningReminderMinute, skillFocus: "tonight's skill")
+    }
+    
+    @ViewBuilder
+    private func kettlebellPlanRow(
+        title: String,
+        currentWeight: Binding<Double>,
+        progressionWeight: Binding<Double>,
+        progressionSets: Binding<Int>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            Picker("Normal", selection: currentWeight) {
+                ForEach(WorkoutData.kbWeights, id: \.self) { weight in
+                    Text(formatWeight(weight)).tag(weight)
+                }
+            }
+            Picker("Progression", selection: progressionWeight) {
+                ForEach(WorkoutData.kbWeights, id: \.self) { weight in
+                    Text(formatWeight(weight)).tag(weight)
+                }
+            }
+            Stepper("Progression sets: \(progressionSets.wrappedValue)", value: progressionSets, in: 0...10, step: 2)
+                .font(.subheadline)
+            Text(progressionDescription(for: progressionSets.wrappedValue))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
     }
     
     @ViewBuilder
@@ -192,6 +294,22 @@ struct SettingsView: View {
         ), displayedComponents: .hourAndMinute)
     }
     
+    
+    private func evenProgressionSetCount(_ value: Int) -> Int {
+        min(max(value, 0), 10) / 2 * 2
+    }
+    
+    private func progressionDescription(for setCount: Int) -> String {
+        let slots = progressionSetSlots(totalSets: 10, progressionSetCount: setCount)
+        guard !slots.isEmpty else { return "All sets use the normal weight." }
+        return "Progression weight on sets \(slots.map(String.init).joined(separator: ", "))."
+    }
+    
+    private func progressionSetSlots(totalSets: Int, progressionSetCount: Int) -> [Int] {
+        let middleSlots = totalSets >= 4 ? Array(3...totalSets) : []
+        let startingSlots = min(totalSets, 2) >= 1 ? Array(1...min(totalSets, 2)) : []
+        return Array((middleSlots + startingSlots).prefix(evenProgressionSetCount(progressionSetCount)))
+    }
     
     private func formatWeight(_ kg: Double) -> String {
         kg.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(kg)) kg" : "\(kg) kg"

@@ -316,6 +316,7 @@ public struct RecoveryDataDTO: Codable, Sendable {
     public var restingHRScore: Double? = nil
     public var sleepDurationScore: Double? = nil
     public var sleepQualityScore: Double? = nil
+    public var sleepQualityPercent: Double? = nil
     public var respiratoryRateScore: Double? = nil
     public var trainingLoadScore: Double? = nil
     public var hrv: Double? = nil

@@ -338,6 +338,7 @@ struct RecoveryView: View {
                     hrv: record.hrv,
                     restingHeartRate: record.restingHR,
                     sleepDuration: record.sleepHours,
+                    sleepQualityPercent: record.sleepQualityPercent,
                     respiratoryRate: record.respiratoryRate,
                     activeEnergyYesterday: record.activeEnergyYesterday
                 ),
@@ -353,7 +354,7 @@ struct RecoveryView: View {
     
     private func dataQuality(from record: RecoveryScoreRecord) -> RecoveryScore.DataQuality {
         let count = [record.hrv, record.restingHR, record.sleepHours,
-                     record.sleepQualityScore, record.respiratoryRate]
+                     record.sleepQualityPercent, record.respiratoryRate]
             .compactMap { $0 }.count
         switch count {
         case 4...: return .rich

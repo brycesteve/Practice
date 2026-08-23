@@ -35,6 +35,12 @@ public struct WCSyncPayload: Codable, Sendable {
     public var eveningRotationDay: Int
     public var targetSwingWeightKg: Double
     public var targetTGUWeightKg: Double
+    public var currentSwingWeightKg: Double
+    public var currentTGUWeightKg: Double
+    public var swingProgressionWeightKg: Double
+    public var tguProgressionWeightKg: Double
+    public var swingProgressionSetCount: Int
+    public var tguProgressionSetCount: Int
     public var lastSwingWeightKg: Double
     public var lastTGUWeightKg: Double
     public var recoveryData: RecoveryDataDTO?
@@ -47,6 +53,12 @@ public struct WCSyncPayload: Codable, Sendable {
         eveningRotationDay: Int = 0,
         targetSwingWeightKg: Double = 24,
         targetTGUWeightKg: Double = 24,
+        currentSwingWeightKg: Double = 24,
+        currentTGUWeightKg: Double = 24,
+        swingProgressionWeightKg: Double = 28,
+        tguProgressionWeightKg: Double = 28,
+        swingProgressionSetCount: Int = 0,
+        tguProgressionSetCount: Int = 0,
         lastSwingWeightKg: Double = 24,
         lastTGUWeightKg: Double = 24,
         recoveryData: RecoveryDataDTO? = nil,
@@ -56,10 +68,51 @@ public struct WCSyncPayload: Codable, Sendable {
         self.eveningRotationDay = eveningRotationDay
         self.targetSwingWeightKg = targetSwingWeightKg
         self.targetTGUWeightKg = targetTGUWeightKg
+        self.currentSwingWeightKg = currentSwingWeightKg
+        self.currentTGUWeightKg = currentTGUWeightKg
+        self.swingProgressionWeightKg = swingProgressionWeightKg
+        self.tguProgressionWeightKg = tguProgressionWeightKg
+        self.swingProgressionSetCount = swingProgressionSetCount
+        self.tguProgressionSetCount = tguProgressionSetCount
         self.lastSwingWeightKg = lastSwingWeightKg
         self.lastTGUWeightKg = lastTGUWeightKg
         self.recoveryData = recoveryData
         self.restDays = restDays
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case skillProgressions
+        case eveningRotationDay
+        case targetSwingWeightKg
+        case targetTGUWeightKg
+        case currentSwingWeightKg
+        case currentTGUWeightKg
+        case swingProgressionWeightKg
+        case tguProgressionWeightKg
+        case swingProgressionSetCount
+        case tguProgressionSetCount
+        case lastSwingWeightKg
+        case lastTGUWeightKg
+        case recoveryData
+        case restDays
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        skillProgressions = try container.decodeIfPresent([SkillProgression].self, forKey: .skillProgressions) ?? []
+        eveningRotationDay = try container.decodeIfPresent(Int.self, forKey: .eveningRotationDay) ?? 0
+        targetSwingWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetSwingWeightKg) ?? 24
+        targetTGUWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetTGUWeightKg) ?? 24
+        lastSwingWeightKg = try container.decodeIfPresent(Double.self, forKey: .lastSwingWeightKg) ?? 24
+        lastTGUWeightKg = try container.decodeIfPresent(Double.self, forKey: .lastTGUWeightKg) ?? 24
+        currentSwingWeightKg = try container.decodeIfPresent(Double.self, forKey: .currentSwingWeightKg) ?? lastSwingWeightKg
+        currentTGUWeightKg = try container.decodeIfPresent(Double.self, forKey: .currentTGUWeightKg) ?? lastTGUWeightKg
+        swingProgressionWeightKg = try container.decodeIfPresent(Double.self, forKey: .swingProgressionWeightKg) ?? currentSwingWeightKg
+        tguProgressionWeightKg = try container.decodeIfPresent(Double.self, forKey: .tguProgressionWeightKg) ?? currentTGUWeightKg
+        swingProgressionSetCount = try container.decodeIfPresent(Int.self, forKey: .swingProgressionSetCount) ?? 0
+        tguProgressionSetCount = try container.decodeIfPresent(Int.self, forKey: .tguProgressionSetCount) ?? 0
+        recoveryData = try container.decodeIfPresent(RecoveryDataDTO.self, forKey: .recoveryData)
+        restDays = try container.decodeIfPresent([Date].self, forKey: .restDays) ?? []
     }
     
     public mutating func updateRestDays(_ days: [Date]) {
@@ -207,9 +260,11 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
                let weightKg = dict["weightKg"] as? Double,
                let sets = dict["sets"] as? Int,
                let reps = dict["reps"] as? Int {
+                let id = (dict["id"] as? String).flatMap(UUID.init(uuidString:)) ?? UUID()
+                let date = (dict["date"] as? Double).map { Date(timeIntervalSince1970: $0) } ?? Date()
                 // Pass Sendable transfer type — delegate constructs the @Model on main actor
                 let transfer = KettlebellEntryTransfer(
-                    exerciseType: exType, weightKg: weightKg, sets: sets, reps: reps
+                    id: id, date: date, exerciseType: exType, weightKg: weightKg, sets: sets, reps: reps
                 )
                 await delegate?.didReceiveKettlebellEntry(transfer)
             }
@@ -219,6 +274,15 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
                 await delegate?.didReceiveSyncPayload(payload)
                 
                 AppGroupDefaults.shared.saveAppContext(payload)
+                
+                await MainActor.run {
+                    self.lastSyncDate = Date()
+                    
+                    NotificationCenter.default.post(
+                        name: .syncPayloadReceived,
+                        object: nil
+                    )
+                }
                 
                 // Post notification so WatchRecoveryView updates reactively
                 // without needing to be the delegate itself

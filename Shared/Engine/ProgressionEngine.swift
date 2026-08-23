@@ -87,10 +87,21 @@ public struct ProgressionEngine: Sendable {
             }
         }
         
-        // Build a helpful maintenance message
+        // Build a helpful maintenance message once enough sessions exist.
         let avgDiff = recentHistory.map(\.averageDifficulty).reduce(0, +) / Double(recentHistory.count)
-        let difficultyNote = allEasyEnough ? "" : " (avg difficulty \(String(format: "%.1f", avgDiff)) — still feels tough)"
-        return .maintain(reason: "Keep building consistency at this level\(difficultyNote). \(criteria.consecutiveSessions - recentHistory.count) more qualifying session(s) needed.")
+        var blockers: [String] = []
+        if !allMeetTarget {
+            blockers.append("not every set met the target yet")
+        }
+        if !allEasyEnough {
+            blockers.append("average effort is still \(String(format: "%.1f", avgDiff))/5")
+        }
+        
+        if blockers.isEmpty {
+            return .maintain(reason: "Keep building consistency at this level.")
+        }
+        
+        return .maintain(reason: "Keep this level for now: \(blockers.joined(separator: ", ")).")
     }
     
     /// Apply a recommendation to a progression, returning an updated copy.

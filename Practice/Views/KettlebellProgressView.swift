@@ -16,11 +16,12 @@ struct KettlebellProgressView: View {
     private var swingRecords: [KettlebellWeightRecord] { allRecords.filter { $0.exerciseType == .swing } }
     private var tguRecords:   [KettlebellWeightRecord] { allRecords.filter { $0.exerciseType == .tgu   } }
     
-    private var latestSwingKg: Double? { swingRecords.first?.weightKg }
-    private var latestTGUKg:   Double? { tguRecords.first?.weightKg   }
-    
     private var swingPB: Double? { swingRecords.max(by: { $0.weightKg < $1.weightKg })?.weightKg }
     private var tguPB:   Double? { tguRecords.max(by:   { $0.weightKg < $1.weightKg })?.weightKg }
+    
+    private var recentSummaries: [KettlebellSessionSummary] {
+        KettlebellSessionSummary.makeSummaries(from: allRecords)
+    }
     
     var body: some View {
         NavigationStack {
@@ -34,7 +35,7 @@ struct KettlebellProgressView: View {
                     exerciseCard(
                         title: "One-Arm Swing",
                         icon: "figure.strengthtraining.functional",
-                        records: Array(swingRecords.suffix(30).reversed()),
+                        records: Array(swingRecords.prefix(30).reversed()),
                         pbKg: swingPB,
                         targetKg: settings.targetSwingWeightKg,
                         color: .orange
@@ -44,7 +45,7 @@ struct KettlebellProgressView: View {
                     exerciseCard(
                         title: "Turkish Get-Up",
                         icon: "figure.mind.and.body",
-                        records: Array(tguRecords.suffix(30).reversed()),
+                        records: Array(tguRecords.prefix(30).reversed()),
                         pbKg: tguPB,
                         targetKg: settings.targetTGUWeightKg,
                         color: .purple
@@ -67,14 +68,14 @@ struct KettlebellProgressView: View {
                 .font(.headline)
             
             progressRow(
-                label: "Swing",
-                current: latestSwingKg ?? 0,
+                label: "Swing PB",
+                current: swingPB ?? 0,
                 target: settings.targetSwingWeightKg,
                 color: .orange
             )
             progressRow(
-                label: "TGU",
-                current: latestTGUKg ?? 0,
+                label: "TGU PB",
+                current: tguPB ?? 0,
                 target: settings.targetTGUWeightKg,
                 color: .purple
             )
@@ -165,29 +166,40 @@ struct KettlebellProgressView: View {
     
     private var recentLog: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recent Sets")
+            Text("Recent Sessions")
                 .font(.headline)
             
-            ForEach(Array(allRecords.prefix(15))) { record in
-                HStack {
-                    Image(systemName: record.exerciseType == .swing ? "figure.strengthtraining.functional" : "figure.mind.and.body")
-                        .foregroundStyle(record.exerciseType == .swing ? .orange : .purple)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(record.exerciseType.shortName)
-                            .font(.subheadline)
-                        Text(record.date.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+            if recentSummaries.isEmpty {
+                Text("No kettlebell sets logged yet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(recentSummaries.prefix(10))) { summary in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: summary.exerciseType == .swing ? "figure.strengthtraining.functional" : "figure.mind.and.body")
+                            .foregroundStyle(summary.exerciseType == .swing ? .orange : .purple)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(summary.exerciseType.shortName)
+                                .font(.subheadline)
+                            Text(summary.date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(summary.loadBreakdown.map { "\(formatWeight($0.weightKg)) x \($0.sets) sets" }.joined(separator: ", "))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(formatWeight(summary.topWeightKg))
+                                .font(.subheadline.bold())
+                            Text("\(summary.totalSets) sets · \(summary.totalReps) reps")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    Spacer()
-                    Text(formatWeight(record.weightKg))
-                        .font(.subheadline.bold())
-                    Text("× \(record.reps)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Divider()
                 }
-                Divider()
             }
         }
         .padding()
@@ -204,5 +216,50 @@ struct KettlebellProgressView: View {
     
     private func formatWeight(_ kg: Double) -> String {
         kg.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(kg))kg" : "\(kg)kg"
+    }
+}
+
+private struct KettlebellSessionSummary: Identifiable {
+    let id: String
+    let date: Date
+    let exerciseType: KettlebellExerciseType
+    let totalSets: Int
+    let totalReps: Int
+    let topWeightKg: Double
+    let loadBreakdown: [(weightKg: Double, sets: Int)]
+    
+    static func makeSummaries(from records: [KettlebellWeightRecord]) -> [KettlebellSessionSummary] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: records) { record in
+            SummaryKey(
+                day: calendar.startOfDay(for: record.date),
+                exerciseType: record.exerciseType
+            )
+        }
+        
+        return grouped.map { key, records in
+            let sortedRecords = records.sorted { $0.date < $1.date }
+            let loadBreakdown = Dictionary(grouping: records, by: \.weightKg)
+                .map { weight, records in
+                    (weightKg: weight, sets: records.map(\.sets).reduce(0, +))
+                }
+                .sorted { $0.weightKg < $1.weightKg }
+            
+            return KettlebellSessionSummary(
+                id: "\(key.exerciseType.rawValue)-\(key.day.timeIntervalSinceReferenceDate)",
+                date: sortedRecords.first?.date ?? key.day,
+                exerciseType: key.exerciseType,
+                totalSets: records.map(\.sets).reduce(0, +),
+                totalReps: records.map { $0.sets * $0.reps }.reduce(0, +),
+                topWeightKg: records.map(\.weightKg).max() ?? 0,
+                loadBreakdown: loadBreakdown
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+    
+    private struct SummaryKey: Hashable {
+        let day: Date
+        let exerciseType: KettlebellExerciseType
     }
 }

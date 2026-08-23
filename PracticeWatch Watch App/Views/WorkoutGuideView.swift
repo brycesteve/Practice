@@ -10,6 +10,7 @@ import SwiftData
 import HealthKit
 import WatchKit
 import AVFoundation
+import OSLog
 
 // MARK: - Haptics + Audio
 
@@ -39,10 +40,15 @@ private final class AudioCue: NSObject, AVSpeechSynthesizerDelegate {
     func speak(_ text: String) {
         configureAudioSessionIfNeeded()
         
+        if synth.isSpeaking {
+            synth.stopSpeaking(at: .immediate)
+        }
+        
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 1.1
         utterance.volume = 1.0
+        Logger.default.info("Speaking workout cue: \(text, privacy: .public)")
         synth.speak(utterance)
     }
     
@@ -55,8 +61,22 @@ private final class AudioCue: NSObject, AVSpeechSynthesizerDelegate {
             try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
             try session.setActive(true)
         } catch {
+            synth.usesApplicationAudioSession = false
             audioSessionConfigured = false
+            Logger.default.error("Speech audio session failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+    
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        Logger.default.info("Speech cue started: \(utterance.speechString, privacy: .public)")
+    }
+    
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        Logger.default.info("Speech cue finished: \(utterance.speechString, privacy: .public)")
+    }
+    
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        Logger.default.info("Speech cue cancelled: \(utterance.speechString, privacy: .public)")
     }
     
     private static func preferredVoice() -> AVSpeechSynthesisVoice? {
@@ -103,7 +123,7 @@ private extension ExerciseCategory {
 
 // MARK: - Navigation state machine
 
-private struct WorkoutPosition: Equatable {
+struct WorkoutPosition: Equatable {
     var stepIndex: Int
     var round: Int
     var phase: Phase
@@ -120,37 +140,93 @@ private struct WorkoutPosition: Equatable {
     }
 }
 
+@MainActor
+@Observable
+final class WatchActiveWorkoutStore {
+    static let shared = WatchActiveWorkoutStore()
+    
+    var activePlan: SessionPlan?
+    var position = WorkoutPosition.start()
+    var completedExercises: [UUID: CompletedExercise] = [:]
+    var nextTGUSide: TGUSide = .left
+    var workoutStarted = false
+    
+    private init() {}
+    
+    func begin(plan: SessionPlan) {
+        if activePlan?.sessionType != plan.sessionType || !workoutStarted {
+            activePlan = plan
+            position = .start()
+            completedExercises = [:]
+            nextTGUSide = .left
+        }
+        workoutStarted = true
+    }
+    
+    func markFinished() {
+        activePlan = nil
+        workoutStarted = false
+    }
+}
+
 // MARK: - Main View
 
 struct WorkoutGuideView: View {
     @Environment(ErrorState.self) var errorState
     
-    let plan: SessionPlan
+    let initialPlan: SessionPlan
+    
+    init(plan: SessionPlan) {
+        self.initialPlan = plan
+    }
     
     @State private var settings = AppGroupDefaults.shared.loadAppContext()
+    @State private var activeWorkout = WatchActiveWorkoutStore.shared
     
-    @State private var position = WorkoutPosition.start()
-    @State private var completedExercises: [UUID: CompletedExercise] = [:]
     @State private var showSetLogger  = false
     @State private var showPauseMenu  = false
     @State private var showEndConfirm = false
     @State private var showSummary    = false
-    @State private var workoutStarted = false
     @State private var isStarting     = false
     @State private var scrollProxy: ScrollViewProxy? = nil
     @State private var restSecondsRemaining = 0
     @State private var restTimer: Timer? = nil
+    @State private var setLoggerSuggestedDuration: Int? = nil
     @State private var sessionManager = WorkoutSessionManager.shared
     @State private var restCuePlayed = false
     
-    // TGU side tracking — persists across sets within the exercise
-    @State private var nextTGUSide: TGUSide = .left
     // HR threshold — user can adjust on the rest screen
     @State private var hrThresholdOverride: Double? = nil
     // Exercise timer for timed sets
     @State private var exerciseTimerSeconds: Int = 0
     @State private var exerciseTimerRunning: Bool = false
     @State private var exerciseTimer: Timer? = nil
+    @State private var prepCountdownSeconds: Int = 0
+    @State private var prepTimer: Timer? = nil
+    @State private var frozenExerciseTimerSeconds: Int? = nil
+    
+    private var plan: SessionPlan {
+        activeWorkout.activePlan ?? initialPlan
+    }
+    
+    private var position: WorkoutPosition {
+        get { activeWorkout.position }
+        nonmutating set { activeWorkout.position = newValue }
+    }
+    
+    private var completedExercises: [UUID: CompletedExercise] {
+        get { activeWorkout.completedExercises }
+        nonmutating set { activeWorkout.completedExercises = newValue }
+    }
+    
+    private var nextTGUSide: TGUSide {
+        get { activeWorkout.nextTGUSide }
+        nonmutating set { activeWorkout.nextTGUSide = newValue }
+    }
+    
+    private var workoutStarted: Bool {
+        activeWorkout.workoutStarted || sessionManager.isRunning
+    }
     
     // MARK: Helpers
     
@@ -193,7 +269,7 @@ struct WorkoutGuideView: View {
                     plan: plan,
                     completedExercises: Array(completedExercises.values),
                     activeCalories: sessionManager.activeCalories,
-                    avgHeartRate: sessionManager.heartRate,
+                    avgHeartRate: sessionManager.averageHeartRate,
                     elapsedSeconds: sessionManager.elapsedSeconds
                 )
             } else {
@@ -232,7 +308,8 @@ struct WorkoutGuideView: View {
                     step: step,
                     round: position.round,
                     existingSets: completedExercises[step.id]?.sets ?? [],
-                    tguSide: isTGU ? nextTGUSide : nil
+                    tguSide: isTGU ? nextTGUSide : nil,
+                    suggestedDurationSeconds: setLoggerSuggestedDuration
                 ) { loggedSet in
                     handleSetLogged(set: loggedSet, for: step)
                 }
@@ -255,6 +332,13 @@ struct WorkoutGuideView: View {
         }
         .navigationBarBackButtonHidden(workoutStarted)
         .toolbar {
+#if DEBUG
+            ToolbarItem(placement: .topBarLeading) {
+                Button { AudioCue.shared.speak("Ready") } label: {
+                    Image(systemName: "speaker.wave.2")
+                }
+            }
+#endif
             if workoutStarted {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showPauseMenu = true } label: {
@@ -334,7 +418,9 @@ struct WorkoutGuideView: View {
                     Spacer()
                     if let r = logged[i].reps            { Text("\(r) reps").font(.caption2) }
                     if let d = logged[i].durationSeconds { Text("\(d)s").font(.caption2)     }
-                    Text(logged[i].feltDifficulty.emoji).font(.caption2)
+                    if recordsDifficulty(for: step) {
+                        Text(logged[i].feltDifficulty.emoji).font(.caption2)
+                    }
                 }
             }
         }
@@ -355,9 +441,13 @@ struct WorkoutGuideView: View {
             else {
                 Button {
                     TrainingHaptic.setStart()
+                    setLoggerSuggestedDuration = timedLogDuration(for: step)
+                    if step.exercise.setType == .timed {
+                        freezeExerciseTimer()
+                    }
                     showSetLogger = true
                 } label: {
-                    Label("Log Set", systemImage: "checkmark.circle").frame(maxWidth: .infinity)
+                    Label(logButtonTitle(for: step), systemImage: "checkmark.circle").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 
@@ -466,12 +556,16 @@ struct WorkoutGuideView: View {
     }
     
     private var liveMetrics: some View {
-        HStack {
-            Label("\(Int(sessionManager.heartRate)) bpm", systemImage: "heart.fill").foregroundStyle(.red)
-            Spacer()
-            Label("\(Int(sessionManager.activeCalories)) kcal", systemImage: "flame.fill").foregroundStyle(.orange)
+        VStack(alignment: .leading, spacing: 4) {
+            Label(formatWorkoutDuration(sessionManager.elapsedSeconds), systemImage: "clock")
+                .foregroundStyle(.secondary)
+            HStack {
+                Label("\(Int(sessionManager.heartRate)) bpm", systemImage: "heart.fill").foregroundStyle(.red)
+                Spacer()
+                Label("\(Int(sessionManager.activeCalories)) kcal", systemImage: "flame.fill").foregroundStyle(.orange)
+            }
         }
-        .font(.caption2)
+        .font(.caption2.monospacedDigit())
     }
     
     @ViewBuilder
@@ -494,6 +588,22 @@ struct WorkoutGuideView: View {
         hr <= threshold && hr > 0 ? .green : hr > threshold * 1.1 ? .red : .orange
     }
     
+    private func logButtonTitle(for step: WorkoutStep) -> String {
+        guard step.exercise.setType == .timed, let duration = timedLogDuration(for: step) else {
+            return "Log Set"
+        }
+        return "Log \(duration)s"
+    }
+    
+    private func timedLogDuration(for step: WorkoutStep) -> Int? {
+        guard step.exercise.setType == .timed else { return nil }
+        return frozenExerciseTimerSeconds ?? (exerciseTimerSeconds > 0 ? exerciseTimerSeconds : nil)
+    }
+    
+    private func recordsDifficulty(for step: WorkoutStep) -> Bool {
+        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics
+    }
+    
     private func nextExerciseName(after step: WorkoutStep) -> String {
         let next = computeNextPosition(after: step, completing: position.round)
         guard next.stepIndex < plan.steps.count else { return "Done" }
@@ -510,7 +620,7 @@ struct WorkoutGuideView: View {
                 exerciseID: step.exercise.id,
                 exerciseName: step.exercise.name,
                 sets: [],
-                skillLevel: step.exercise.category == .skillProgression ? step.sets : nil
+                skillLevel: skillLevel(for: step)
             )
         }
         completedExercises[step.id]?.sets.append(set)
@@ -638,6 +748,17 @@ struct WorkoutGuideView: View {
         kg.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(kg))kg" : "\(kg)kg"
     }
     
+    private func formatWorkoutDuration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let remainingSeconds = seconds % 60
+        
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainingSeconds)
+        }
+        return String(format: "%d:%02d", minutes, remainingSeconds)
+    }
+    
     private func scrollToTop() {
         Task { @MainActor in
             withAnimation { scrollProxy?.scrollTo("top", anchor: .top) }
@@ -649,41 +770,55 @@ struct WorkoutGuideView: View {
     @ViewBuilder
     private func exerciseTimerView(step: WorkoutStep) -> some View {
         let target = step.durationSeconds ?? step.exercise.defaultDuration ?? 30
+        let isPreparing = prepCountdownSeconds > 0
+        let displaySeconds = frozenExerciseTimerSeconds ?? exerciseTimerSeconds
         
         VStack(spacing: 6) {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.2), lineWidth: 5)
                 Circle()
-                    .trim(from: 0, to: min(Double(exerciseTimerSeconds) / Double(target), 1.0))
+                    .trim(from: 0, to: min(Double(displaySeconds) / Double(target), 1.0))
                     .stroke(
-                        exerciseTimerSeconds >= target ? Color.green : Color.accentColor,
+                        displaySeconds >= target ? Color.green : Color.accentColor,
                         style: StrokeStyle(lineWidth: 5, lineCap: .round)
                     )
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.5), value: exerciseTimerSeconds)
+                    .animation(.linear(duration: 0.5), value: displaySeconds)
                 VStack(spacing: 0) {
-                    Text(formatTimerDisplay(exerciseTimerSeconds))
-                        .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
-                        .foregroundStyle(exerciseTimerSeconds >= target ? .green : .primary)
-                    Text("/ \(target)s")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                    if isPreparing {
+                        Text("\(prepCountdownSeconds)")
+                            .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(.orange)
+                        Text("prep")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(formatTimerDisplay(displaySeconds))
+                            .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(displaySeconds >= target ? .green : .primary)
+                        Text("/ \(target)s")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .frame(width: 80, height: 80)
             
             HStack(spacing: 10) {
                 Button {
-                    if exerciseTimerRunning { stopExerciseTimer() }
-                    else { startExerciseTimer(target: target) }
+                    if exerciseTimerRunning || isPreparing {
+                        freezeExerciseTimer()
+                    } else {
+                        startPrepCountdown(target: target)
+                    }
                 } label: {
-                    Image(systemName: exerciseTimerRunning ? "pause.fill" : "play.fill")
+                    Image(systemName: exerciseTimerRunning || isPreparing ? "stop.fill" : "play.fill")
                         .font(.caption.bold())
                         .frame(width: 36, height: 28)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(exerciseTimerRunning ? .orange : .accentColor)
+                .tint(exerciseTimerRunning || isPreparing ? .orange : .accentColor)
                 
                 Button { resetExerciseTimer() } label: {
                     Image(systemName: "arrow.counterclockwise")
@@ -691,11 +826,19 @@ struct WorkoutGuideView: View {
                         .frame(width: 36, height: 28)
                 }
                 .buttonStyle(.bordered)
-                .disabled(exerciseTimerSeconds == 0 && !exerciseTimerRunning)
+                .disabled(displaySeconds == 0 && !exerciseTimerRunning && !isPreparing)
             }
             
-            if exerciseTimerSeconds >= target {
-                Label("Target reached!", systemImage: "checkmark.circle.fill")
+            if isPreparing {
+                Text("Get into position")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.orange)
+            } else if let frozen = frozenExerciseTimerSeconds {
+                Label("Stopped at \(frozen)s", systemImage: "pause.circle.fill")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.orange)
+            } else if displaySeconds >= target {
+                Label("Target reached", systemImage: "checkmark.circle.fill")
                     .font(.caption2.bold())
                     .foregroundStyle(.green)
             }
@@ -703,7 +846,25 @@ struct WorkoutGuideView: View {
         .padding(.vertical, 4)
     }
     
+    private func startPrepCountdown(target: Int) {
+        resetExerciseTimer()
+        prepCountdownSeconds = 3
+        TrainingHaptic.setStart()
+        prepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
+            Task { @MainActor in
+                if self.prepCountdownSeconds > 1 {
+                    self.prepCountdownSeconds -= 1
+                    TrainingHaptic.setStart()
+                } else {
+                    self.stopPrepTimer()
+                    self.startExerciseTimer(target: target)
+                }
+            }
+        }
+    }
+    
     private func startExerciseTimer(target: Int) {
+        frozenExerciseTimerSeconds = nil
         exerciseTimerRunning = true
         TrainingHaptic.setStart()
         exerciseTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
@@ -717,6 +878,20 @@ struct WorkoutGuideView: View {
         }
     }
     
+    private func freezeExerciseTimer() {
+        stopPrepTimer()
+        stopExerciseTimer()
+        if exerciseTimerSeconds > 0 {
+            frozenExerciseTimerSeconds = exerciseTimerSeconds
+        }
+    }
+    
+    private func stopPrepTimer() {
+        prepCountdownSeconds = 0
+        prepTimer?.invalidate()
+        prepTimer = nil
+    }
+    
     private func stopExerciseTimer() {
         exerciseTimerRunning = false
         exerciseTimer?.invalidate()
@@ -724,8 +899,10 @@ struct WorkoutGuideView: View {
     }
     
     private func resetExerciseTimer() {
+        stopPrepTimer()
         stopExerciseTimer()
         exerciseTimerSeconds = 0
+        frozenExerciseTimerSeconds = nil
     }
     
     private func formatTimerDisplay(_ seconds: Int) -> String {
@@ -741,7 +918,7 @@ struct WorkoutGuideView: View {
         Task {
             do {
                 try await sessionManager.startWorkout(activityType: plan.sessionType.workoutActivityType)
-                workoutStarted = true
+                activeWorkout.begin(plan: plan)
                 TrainingHaptic.setStart()
             } catch {
                 errorState.post("Could not start workout session: \(error.localizedDescription)")
@@ -767,7 +944,8 @@ struct WorkoutGuideView: View {
                 endDate: Date(),
                 exercises: exercises,
                 activeCalories: sessionManager.activeCalories > 0 ? sessionManager.activeCalories : nil,
-                averageHeartRate: sessionManager.heartRate > 0 ? sessionManager.heartRate : nil,
+                averageHeartRate: sessionManager.averageHeartRate > 0 ? sessionManager.averageHeartRate : nil,
+                peakHeartRate: sessionManager.peakHeartRate > 0 ? sessionManager.peakHeartRate : nil,
                 hkWorkoutUUID: hkUUID
             )
             
@@ -782,8 +960,16 @@ struct WorkoutGuideView: View {
             saveSkillEntries()
            
             WatchConnectivityManager.shared.sendWorkout(workout)
+            activeWorkout.markFinished()
             showSummary = true
         }
+    }
+    
+    private func skillLevel(for step: WorkoutStep) -> Int? {
+        guard step.exercise.category == .skillProgression else { return nil }
+        return settings.skillProgressions.first {
+            $0.currentSkillLevel?.name == step.exercise.name
+        }?.currentLevel
     }
     
     private func saveSkillEntries() {
@@ -811,16 +997,46 @@ struct SetLoggerView: View {
     let round: Int
     let existingSets: [CompletedSet]
     let tguSide: TGUSide?           // nil for non-TGU exercises
+    let suggestedDurationSeconds: Int?
     let onComplete: (CompletedSet) -> Void
     
     @State private var currentReps: Int = 0
     @State private var currentDuration: Int = 0
     @State private var currentDifficulty: DifficultyRating = .moderate
-    @State private var weightKg: Double = 24.0
+    @State private var settings = AppGroupDefaults.shared.loadAppContext()
     @Environment(\.dismiss) private var dismiss
     
     private var isTimed: Bool { step.exercise.setType == .timed }
     private var isKB: Bool    { step.exercise.category == .kettlebell }
+    private var recordsDifficulty: Bool {
+        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics
+    }
+    private var kettlebellExerciseType: KettlebellExerciseType {
+        step.exercise.name.contains("Get-Up") ? .tgu : .swing
+    }
+    private var usesProgressionWeight: Bool {
+        progressionSetSlots(totalSets: step.sets, progressionSetCount: progressionSetCount)
+            .contains(existingSets.count + 1)
+    }
+    
+    private var progressionSetCount: Int {
+        let count = kettlebellExerciseType == .tgu
+            ? settings.tguProgressionSetCount
+            : settings.swingProgressionSetCount
+        return evenProgressionSetCount(count)
+    }
+    
+    private var kettlebellWeightKg: Double {
+        if usesProgressionWeight {
+            return kettlebellExerciseType == .tgu
+                ? settings.tguProgressionWeightKg
+                : settings.swingProgressionWeightKg
+        }
+        
+        return kettlebellExerciseType == .tgu
+            ? settings.currentTGUWeightKg
+            : settings.currentSwingWeightKg
+    }
     
     var body: some View {
         ScrollView {
@@ -845,14 +1061,20 @@ struct SetLoggerView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 
                 if isKB {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Weight").font(.caption2).foregroundStyle(.secondary)
-                        Picker("", selection: $weightKg) {
-                            ForEach(WorkoutData.kbWeights, id: \.self) { w in
-                                Text(formatWeight(w)).tag(w)
+                    HStack {
+                        Label("Weight", systemImage: "scalemass")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(formatWeight(kettlebellWeightKg))
+                                .font(.caption.bold())
+                            if usesProgressionWeight {
+                                Text("Progression")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
                             }
                         }
-                        .pickerStyle(.wheel).frame(height: 80)
                     }
                 }
                 
@@ -860,7 +1082,9 @@ struct SetLoggerView: View {
                     Stepper(value: $currentDuration, in: 0...600, step: 1) {
                         Text("Duration: \(currentDuration)s").font(.caption)
                     }
-                    .onAppear { currentDuration = step.durationSeconds ?? step.exercise.defaultDuration ?? 30 }
+                    .onAppear {
+                        currentDuration = suggestedDurationSeconds ?? step.durationSeconds ?? step.exercise.defaultDuration ?? 30
+                    }
                 } else {
                     Stepper(value: $currentReps, in: 0...200, step: 1) {
                         Text("Reps: \(currentReps)").font(.caption)
@@ -868,14 +1092,16 @@ struct SetLoggerView: View {
                     .onAppear { currentReps = step.reps ?? step.exercise.defaultReps ?? 10 }
                 }
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Effort").font(.caption2).foregroundStyle(.secondary)
-                    Picker("", selection: $currentDifficulty) {
-                        ForEach(DifficultyRating.allCases, id: \.self) { d in
-                            Text("\(d.emoji) \(d.label)").tag(d)
+                if recordsDifficulty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Effort").font(.caption2).foregroundStyle(.secondary)
+                        Picker("", selection: $currentDifficulty) {
+                            ForEach(DifficultyRating.allCases, id: \.self) { d in
+                                Text("\(d.emoji) \(d.label)").tag(d)
+                            }
                         }
+                        .pickerStyle(.wheel).frame(height: 80)
                     }
-                    .pickerStyle(.wheel).frame(height: 80)
                 }
                 
                 Button("Log Set") {
@@ -886,9 +1112,11 @@ struct SetLoggerView: View {
                         tguSide: tguSide
                     )
                     if isKB {
-                        let exType: KettlebellExerciseType = step.exercise.name.contains("Get-Up") ? .tgu : .swing
                         WatchConnectivityManager.shared.sendKettlebellEntry(
-                            exerciseType: exType, weightKg: weightKg, sets: 1, reps: currentReps
+                            exerciseType: kettlebellExerciseType,
+                            weightKg: kettlebellWeightKg,
+                            sets: 1,
+                            reps: currentReps
                         )
                     }
                     onComplete(s)
@@ -906,13 +1134,28 @@ struct SetLoggerView: View {
                             Spacer()
                             if let r = s.reps            { Text("\(r)r").font(.caption2) }
                             if let d = s.durationSeconds { Text("\(d)s").font(.caption2) }
-                            Text(s.feltDifficulty.emoji).font(.caption2)
+                            if recordsDifficulty {
+                                Text(s.feltDifficulty.emoji).font(.caption2)
+                            }
                         }
                     }
                 }
             }
             .padding()
         }
+        .onAppear {
+            settings = AppGroupDefaults.shared.loadAppContext()
+        }
+    }
+    
+    private func evenProgressionSetCount(_ value: Int) -> Int {
+        min(max(value, 0), step.sets) / 2 * 2
+    }
+    
+    private func progressionSetSlots(totalSets: Int, progressionSetCount: Int) -> [Int] {
+        let middleSlots = totalSets >= 4 ? Array(3...totalSets) : []
+        let startingSlots = min(totalSets, 2) >= 1 ? Array(1...min(totalSets, 2)) : []
+        return Array((middleSlots + startingSlots).prefix(evenProgressionSetCount(progressionSetCount)))
     }
     
     private func formatWeight(_ kg: Double) -> String {

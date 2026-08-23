@@ -51,6 +51,31 @@ struct AppGroupDefaults {
         saveAppContext(data)
     }
     
+    func updateKettlebellTargets(swing: Double, tgu: Double) {
+        var data = loadAppContext()
+        data.targetSwingWeightKg = swing
+        data.targetTGUWeightKg = tgu
+        saveAppContext(data)
+    }
+    
+    func updateKettlebellPlan(
+        currentSwing: Double,
+        currentTGU: Double,
+        progressionSwing: Double,
+        progressionTGU: Double,
+        swingProgressionSets: Int,
+        tguProgressionSets: Int
+    ) {
+        var data = loadAppContext()
+        data.currentSwingWeightKg = currentSwing
+        data.currentTGUWeightKg = currentTGU
+        data.swingProgressionWeightKg = progressionSwing
+        data.tguProgressionWeightKg = progressionTGU
+        data.swingProgressionSetCount = swingProgressionSets
+        data.tguProgressionSetCount = tguProgressionSets
+        saveAppContext(data)
+    }
+    
     func updateLastTGUWeight(_ weight: Double) {
         var data = loadAppContext()
         data.lastTGUWeightKg = weight

@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import WidgetKit
 
 @MainActor
 public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
@@ -141,6 +142,11 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
     public func didReceiveKettlebellEntry(_ transfer: KettlebellEntryTransfer) async {
         let context = modelContainer.mainContext
         
+        let id = transfer.id
+        guard (try? context.fetch(
+            FetchDescriptor<KettlebellWeightRecord>(predicate: #Predicate { $0.id == id })
+        ))?.isEmpty != false else { return }
+        
         let record = transfer.toRecord()
         context.insert(record)
         
@@ -240,8 +246,64 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
     
     
     func sendFullSyncToWatch() async {
-        let cachedPayload = AppGroupDefaults.shared.loadAppContext()
-        WatchConnectivityManager.shared.sendFullSync(payload: cachedPayload)
+        let payload = buildSyncPayload()
+        AppGroupDefaults.shared.saveAppContext(payload)
+        WatchConnectivityManager.shared.sendFullSync(payload: payload)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    private func buildSyncPayload() -> WCSyncPayload {
+        let context = modelContainer.mainContext
+        let cached = AppGroupDefaults.shared.loadAppContext()
         
+        var progressionRecords = (try? context.fetch(FetchDescriptor<SkillProgressionRecord>())) ?? []
+        if progressionRecords.isEmpty {
+            progressionRecords = SkillProgressions.defaultSkillProgressions.map { progression in
+                let record = SkillProgressionRecord(from: progression)
+                context.insert(record)
+                return record
+            }
+            try? context.save()
+        }
+        
+        let settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
+        let kbRecords = (try? context.fetch(FetchDescriptor<KettlebellWeightRecord>())) ?? []
+        let restDayRecords = (try? context.fetch(FetchDescriptor<RestDayRecord>())) ?? []
+        let recoveryRecords = (try? context.fetch(FetchDescriptor<RecoveryScoreRecord>())) ?? []
+        
+        let progressions = progressionRecords.map { $0.toSkillProgression() }
+        let latestSwing = kbRecords
+            .filter { $0.exerciseType == .swing }
+            .max(by: { $0.date < $1.date })?
+            .weightKg
+        let latestTGU = kbRecords
+            .filter { $0.exerciseType == .tgu }
+            .max(by: { $0.date < $1.date })?
+            .weightKg
+        let restDays = restDayRecords.isEmpty
+            ? cached.restDays
+            : restDayRecords.map { $0.date }
+        let today = Calendar.current.startOfDay(for: Date())
+        let recoveryData = recoveryRecords
+            .filter { $0.date >= today }
+            .max(by: { $0.date < $1.date })?
+            .toDTO() ?? cached.recoveryData
+        
+        return WCSyncPayload(
+            skillProgressions: progressions,
+            eveningRotationDay: settings?.eveningRotationDay ?? cached.eveningRotationDay,
+            targetSwingWeightKg: settings?.targetSwingWeightKg ?? cached.targetSwingWeightKg,
+            targetTGUWeightKg: settings?.targetTGUWeightKg ?? cached.targetTGUWeightKg,
+            currentSwingWeightKg: settings?.currentSwingWeightKg ?? cached.currentSwingWeightKg,
+            currentTGUWeightKg: settings?.currentTGUWeightKg ?? cached.currentTGUWeightKg,
+            swingProgressionWeightKg: settings?.swingProgressionWeightKg ?? cached.swingProgressionWeightKg,
+            tguProgressionWeightKg: settings?.tguProgressionWeightKg ?? cached.tguProgressionWeightKg,
+            swingProgressionSetCount: settings?.swingProgressionSetCount ?? cached.swingProgressionSetCount,
+            tguProgressionSetCount: settings?.tguProgressionSetCount ?? cached.tguProgressionSetCount,
+            lastSwingWeightKg: latestSwing ?? cached.lastSwingWeightKg,
+            lastTGUWeightKg: latestTGU ?? cached.lastTGUWeightKg,
+            recoveryData: recoveryData,
+            restDays: restDays
+        )
     }
 }

@@ -283,6 +283,10 @@ public enum Skill: String, RawRepresentable, CaseIterable {
     -> [WorkoutStep]
     {
         let warmupGroup = UUID()
+        let isTimedProgression = currentLevel?.targetDurationSeconds != nil || currentLevel == nil
+        let progressionDuration = currentLevel?.targetDurationSeconds ?? 30
+        let progressionReps = currentLevel?.targetReps ?? 3
+        
         return [
             WorkoutStep(
                 exercise: Exercise(
@@ -331,16 +335,20 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 exercise: Exercise(
                     name: currentLevel?.name ?? "Ring Support Hold",
                     category: .skillProgression,
-                    setType: .reps,
+                    setType: isTimedProgression ? .timed : .reps,
                     defaultSets: 5,
-                    defaultReps: currentLevel?.targetReps ?? 3,
+                    defaultReps: isTimedProgression ? nil : progressionReps,
+                    defaultDuration: isTimedProgression ? progressionDuration : nil,
                     notes: currentLevel?.details
                     ?? "Hold support, rings turned out"
                 ),
                 sets: 5,
-                reps: currentLevel?.targetReps ?? 3,
+                reps: isTimedProgression ? nil : progressionReps,
+                durationSeconds: isTimedProgression ? progressionDuration : nil,
                 restSeconds: 120,
-                notes: "Log actual reps and difficulty."
+                notes: isTimedProgression
+                    ? "Log actual hold time and difficulty."
+                    : "Log actual reps and difficulty."
             ),
             
         ] + ringStretches()
@@ -425,14 +433,14 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                     category: .skillProgression,
                     setType: .timed,
                     defaultSets: 5,
-                    defaultReps: currentLevel?.targetDurationSeconds ?? 15,
+                    defaultDuration: currentLevel?.targetDurationSeconds ?? 15,
                     notes: currentLevel?.details
-                    ?? "Kness Tucked. Hips in line with elbows"
+                    ?? "Knees tucked. Hips in line with elbows"
                 ),
                 sets: 5,
                 durationSeconds: currentLevel?.targetDurationSeconds ?? 15,
                 restSeconds: 120,
-                notes: "Log actual reps and difficulty."
+                notes: "Log actual hold time and difficulty."
             ),
             
         ] + frontLeverStretches()
@@ -481,18 +489,18 @@ public enum Skill: String, RawRepresentable, CaseIterable {
             
             WorkoutStep(
                 exercise: Exercise(
-                    name: currentLevel?.name ?? "Tuck Front Lever",
+                    name: currentLevel?.name ?? "Compression Hold",
                     category: .skillProgression,
                     setType: .timed,
                     defaultSets: 5,
-                    defaultReps: currentLevel?.targetDurationSeconds ?? 15,
+                    defaultDuration: currentLevel?.targetDurationSeconds ?? 15,
                     notes: currentLevel?.details
-                    ?? "Kness Tucked. Hips in line with elbows"
+                    ?? "Hold active pike compression."
                 ),
                 sets: 5,
                 durationSeconds: currentLevel?.targetDurationSeconds ?? 15,
                 restSeconds: 120,
-                notes: "Log actual reps and difficulty."
+                notes: "Log actual hold time and difficulty."
             ),
             
         ] + compressionStretches()
