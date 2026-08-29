@@ -208,10 +208,12 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
     
     public func sendFullSync(payload: WCSyncPayload) {
         guard let data = try? JSONEncoder().encode(payload) else { return }
+        let message = [WCMessageKey.fullSync: data]
         // Use updateApplicationContext for background delivery (survives disconnection)
-        transferApplicationContext([WCMessageKey.fullSync: data])
+        transferApplicationContext(message)
+        transferComplicationUserInfoIfNeeded(message)
         // Also try real-time if reachable
-        send(message: [WCMessageKey.fullSync: data])
+        send(message: message)
     }
     
     
@@ -236,7 +238,19 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
     }
     
     private func transferApplicationContext(_ context: [String: Any]) {
-        try? session?.updateApplicationContext(context)
+        guard let session, session.activationState == .activated else { return }
+        try? session.updateApplicationContext(context)
+    }
+    
+    private func transferComplicationUserInfoIfNeeded(_ userInfo: [String: Any]) {
+#if os(iOS)
+        guard let session,
+              session.activationState == .activated,
+              session.isPaired,
+              session.isWatchAppInstalled,
+              session.remainingComplicationUserInfoTransfers > 0 else { return }
+        session.transferCurrentComplicationUserInfo(userInfo)
+#endif
     }
     
     // MARK: - Receive

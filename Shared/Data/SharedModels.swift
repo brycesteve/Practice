@@ -154,20 +154,134 @@ public struct SessionPlan: Identifiable, Codable, Sendable {
 
 // MARK: - Completed Workout
 
+public struct HeartRateSample: Codable, Sendable, Equatable {
+    public var timestamp: Date
+    public var beatsPerMinute: Double
+
+    public init(timestamp: Date, beatsPerMinute: Double) {
+        self.timestamp = timestamp
+        self.beatsPerMinute = beatsPerMinute
+    }
+}
+
 public struct CompletedSet: Identifiable, Codable, Sendable {
     public let id: UUID
     public var reps: Int?
     public var durationSeconds: Int?
     public var feltDifficulty: DifficultyRating  // 1–5
     public var tguSide: TGUSide?                 // non-nil for TGU sets only
+    public var weightKg: Double?
+    public var startedAt: Date?
+    public var endedAt: Date?
+    public var preSetHeartRate: Double?
+    public var peakHeartRate: Double?
+    public var recoveryHeartRate: Double?
+    public var recoveryStartedAt: Date?
+
+    public var heartRateExcursion: Double? {
+        guard let preSetHeartRate, let peakHeartRate else { return nil }
+        return peakHeartRate - preSetHeartRate
+    }
+
+    public var recoveryDuration: TimeInterval? {
+        guard let endedAt, let recoveryStartedAt else { return nil }
+        return max(0, recoveryStartedAt.timeIntervalSince(endedAt))
+    }
+
+    public var heartRateRecoveryDelta: Double? {
+        guard let peakHeartRate, let recoveryHeartRate else { return nil }
+        return peakHeartRate - recoveryHeartRate
+    }
     
-    public init(id: UUID = UUID(), reps: Int? = nil, durationSeconds: Int? = nil,
-                feltDifficulty: DifficultyRating = .moderate, tguSide: TGUSide? = nil) {
+    public init(
+        id: UUID = UUID(),
+        reps: Int? = nil,
+        durationSeconds: Int? = nil,
+        feltDifficulty: DifficultyRating = .moderate,
+        tguSide: TGUSide? = nil,
+        weightKg: Double? = nil,
+        startedAt: Date? = nil,
+        endedAt: Date? = nil,
+        preSetHeartRate: Double? = nil,
+        peakHeartRate: Double? = nil,
+        recoveryHeartRate: Double? = nil,
+        recoveryStartedAt: Date? = nil
+    ) {
         self.id = id
         self.reps = reps
         self.durationSeconds = durationSeconds
         self.feltDifficulty = feltDifficulty
         self.tguSide = tguSide
+        self.weightKg = weightKg
+        self.startedAt = startedAt
+        self.endedAt = endedAt
+        self.preSetHeartRate = preSetHeartRate
+        self.peakHeartRate = peakHeartRate
+        self.recoveryHeartRate = recoveryHeartRate
+        self.recoveryStartedAt = recoveryStartedAt
+    }
+}
+
+public enum SwingSetHeartRateLogic {
+    public static let postSetPeakWindow: TimeInterval = 15
+    public static let maximumPreSetSampleAge: TimeInterval = 15
+
+    public static func mostRecentSample(
+        atOrBefore boundary: Date,
+        samples: [HeartRateSample],
+        maximumAge: TimeInterval = maximumPreSetSampleAge
+    ) -> HeartRateSample? {
+        samples
+            .filter {
+                $0.beatsPerMinute > 0 &&
+                $0.timestamp <= boundary &&
+                boundary.timeIntervalSince($0.timestamp) <= maximumAge
+            }
+            .max { $0.timestamp < $1.timestamp }
+    }
+
+    public static func peakHeartRate(
+        setStartedAt: Date,
+        setEndedAt: Date,
+        nextSetStartedAt: Date?,
+        samples: [HeartRateSample]
+    ) -> Double? {
+        let nominalEnd = setEndedAt.addingTimeInterval(postSetPeakWindow)
+        let upperBound = min(nominalEnd, nextSetStartedAt ?? nominalEnd)
+        return samples
+            .filter {
+                $0.beatsPerMinute > 0 &&
+                $0.timestamp >= setStartedAt &&
+                $0.timestamp < upperBound
+            }
+            .map(\.beatsPerMinute)
+            .max()
+    }
+
+    public static func finalized(
+        _ set: CompletedSet,
+        nextSetStartedAt: Date?,
+        samples: [HeartRateSample]
+    ) -> CompletedSet {
+        var result = set
+        if let startedAt = set.startedAt, let endedAt = set.endedAt {
+            result.preSetHeartRate = set.preSetHeartRate ??
+                mostRecentSample(atOrBefore: startedAt, samples: samples)?.beatsPerMinute
+            result.peakHeartRate = peakHeartRate(
+                setStartedAt: startedAt,
+                setEndedAt: endedAt,
+                nextSetStartedAt: nextSetStartedAt,
+                samples: samples
+            )
+        }
+        if let nextSetStartedAt {
+            result.recoveryStartedAt = nextSetStartedAt
+            result.recoveryHeartRate = mostRecentSample(
+                atOrBefore: nextSetStartedAt,
+                samples: samples
+            )?.beatsPerMinute
+        }
+        return result
     }
 }
 

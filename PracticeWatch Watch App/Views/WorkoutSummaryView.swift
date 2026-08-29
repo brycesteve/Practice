@@ -8,7 +8,17 @@ struct WorkoutSummaryView: View {
     let activeCalories: Double
     let avgHeartRate: Double
     let elapsedSeconds: Int
-    
+
+    private var swingSets: [CompletedSet] {
+        completedExercises.first {
+            $0.exerciseName.localizedCaseInsensitiveContains("swing")
+        }?.sets ?? []
+    }
+
+    private func average(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
     
     @Environment(\.dismiss) private var dismiss
     
@@ -33,6 +43,12 @@ struct WorkoutSummaryView: View {
                 statsRow(icon: "flame.fill", label: "Calories", value: "\(Int(activeCalories)) kcal", color: .orange)
                 if avgHeartRate > 0 {
                     statsRow(icon: "heart.fill", label: "Avg HR", value: "\(Int(avgHeartRate)) bpm", color: .red)
+                }
+                if let averagePeak = average(swingSets.compactMap(\.peakHeartRate)) {
+                    statsRow(icon: "heart.text.clipboard", label: "Swing peak", value: "\(Int(averagePeak)) bpm")
+                }
+                if let averageRecovery = average(swingSets.compactMap(\.recoveryDuration)) {
+                    statsRow(icon: "timer", label: "Avg recovery", value: "\(Int(averageRecovery.rounded())) sec")
                 }
                 
                 Divider()

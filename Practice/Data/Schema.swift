@@ -22,14 +22,17 @@ import SwiftData
 /// breaking change (renamed properties, removed models, changed relationships).
 enum TrainingMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] { [
-        TrainingSchemaV1.self
+        TrainingSchemaV1.self,
+        TrainingSchemaV2.self
     ] }
-    static var stages: [MigrationStage] { [] }  // add stages here for future versions
+    static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: TrainingSchemaV1.self, toVersion: TrainingSchemaV2.self)]
+    }  // add stages here for future versions
 }
 
 // MARK: - SwiftData Model Aliases
 
-typealias CurrentSchema = TrainingSchemaV1
+typealias CurrentSchema = TrainingSchemaV2
 typealias WorkoutRecord = CurrentSchema.WorkoutRecord
 typealias ExerciseRecord = CurrentSchema.ExerciseRecord
 typealias SetRecord = CurrentSchema.SetRecord

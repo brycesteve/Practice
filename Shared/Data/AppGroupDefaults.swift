@@ -15,6 +15,7 @@ struct AppGroupDefaults {
     func saveAppContext(_ data: WCSyncPayload) {
         let data = try? JSONEncoder().encode(data)
         defaults?.set(data, forKey: "appContext")
+        defaults?.synchronize()
     }
     
     func loadAppContext() -> WCSyncPayload {

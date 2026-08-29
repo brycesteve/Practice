@@ -230,6 +230,8 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     public var elapsedSeconds: Int = 0
     public var isRunning: Bool = false
     public var isPaused: Bool = false
+    public private(set) var heartRateSamples: [HeartRateSample] = []
+    public private(set) var latestHeartRateSample: HeartRateSample?
     
     private var timer: Timer?
     private var sessionStartDate: Date?
@@ -313,6 +315,8 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         sessionStartDate = nil
         heartRateSampleTotal = 0
         heartRateSampleCount = 0
+        heartRateSamples = []
+        latestHeartRateSample = nil
     }
     
     private func startTimer() {
@@ -362,11 +366,19 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
                 case HKQuantityType(.heartRate):
                     let hrUnit = HKUnit.count().unitDivided(by: .minute())
                     guard let latestHeartRate = stats?.mostRecentQuantity()?.doubleValue(for: hrUnit) else { break }
+                    let timestamp = stats?.mostRecentQuantityDateInterval()?.end ?? Date()
+                    let sample = HeartRateSample(timestamp: timestamp, beatsPerMinute: latestHeartRate)
                     self.heartRate = latestHeartRate
                     self.peakHeartRate = max(self.peakHeartRate, latestHeartRate)
-                    self.heartRateSampleTotal += latestHeartRate
-                    self.heartRateSampleCount += 1
-                    self.averageHeartRate = self.heartRateSampleTotal / Double(self.heartRateSampleCount)
+                    if self.latestHeartRateSample?.timestamp != timestamp ||
+                        self.latestHeartRateSample?.beatsPerMinute != latestHeartRate {
+                        self.latestHeartRateSample = sample
+                        self.heartRateSamples.append(sample)
+                        self.heartRateSamples.sort { $0.timestamp < $1.timestamp }
+                        self.heartRateSampleTotal += latestHeartRate
+                        self.heartRateSampleCount += 1
+                        self.averageHeartRate = self.heartRateSampleTotal / Double(self.heartRateSampleCount)
+                    }
                     
                 case HKQuantityType(.activeEnergyBurned):
                     let calUnit = HKUnit.kilocalorie()

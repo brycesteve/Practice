@@ -94,6 +94,14 @@ struct WorkoutDetailView: View {
     
     // Unwrap optional relationship arrays once, reuse throughout the view
     private var exercises: [ExerciseRecord] { workout.exercisesSorted }
+    private var swingSets: [SetRecord] {
+        exercises.first { $0.exerciseName.localizedCaseInsensitiveContains("swing") }?.setsSorted ?? []
+    }
+
+    private func average(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
     
     var body: some View {
         List {
@@ -119,6 +127,34 @@ struct WorkoutDetailView: View {
                 }
             }
             
+            if !swingSets.isEmpty {
+                let preValues = swingSets.compactMap(\.preSetHeartRate)
+                let peakValues = swingSets.compactMap(\.peakHeartRate)
+                let excursionValues = swingSets.compactMap(\.heartRateExcursion)
+                let recoveryValues = swingSets.compactMap(\.recoveryHeartRate)
+                let durationValues = swingSets.compactMap(\.recoveryDuration)
+                let deltaValues = swingSets.compactMap(\.heartRateRecoveryDelta)
+
+                Section("Swing cardiovascular response") {
+                    cardioSummaryRow("Average pre HR", value: average(preValues), suffix: "bpm")
+                    cardioSummaryRow("Average peak HR", value: average(peakValues), suffix: "bpm")
+                    cardioSummaryRow("Maximum peak HR", value: peakValues.max(), suffix: "bpm")
+                    cardioSummaryRow("Average excursion", value: average(excursionValues), prefix: "+", suffix: "bpm")
+                    cardioSummaryRow("Average recovery HR", value: average(recoveryValues), suffix: "bpm")
+                    cardioSummaryRow("Average recovery", value: average(durationValues), suffix: "sec")
+                    cardioSummaryRow("Fastest recovery", value: durationValues.min(), suffix: "sec")
+                    cardioSummaryRow("Slowest recovery", value: durationValues.max(), suffix: "sec")
+                    cardioSummaryRow("Average HR recovery", value: average(deltaValues), prefix: "−", suffix: "bpm")
+                    if let first = peakValues.first, let last = peakValues.last {
+                        LabeledContent("First → final peak", value: "\(Int(first)) → \(Int(last)) bpm")
+                        LabeledContent("Peak drift", value: String(format: "%+.0f bpm", last - first))
+                    }
+                    if !peakValues.isEmpty {
+                        LabeledContent("Set peaks", value: peakValues.map { String(Int($0)) }.joined(separator: " · "))
+                    }
+                }
+            }
+
             if exercises.isEmpty {
                 Section("Exercises") {
                     Text("No exercises logged.")
@@ -134,6 +170,18 @@ struct WorkoutDetailView: View {
         }
         .navigationTitle(workout.sessionType.displayName)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func cardioSummaryRow(
+        _ label: String,
+        value: Double?,
+        prefix: String = "",
+        suffix: String
+    ) -> some View {
+        if let value {
+            LabeledContent(label, value: "\(prefix)\(Int(value.rounded())) \(suffix)")
+        }
     }
 }
 
@@ -183,24 +231,41 @@ struct SetRow: View {
     }
     
     var body: some View {
-        HStack {
-            if let side = set.tguSide {
-                Text("Set \(index + 1) · \(side.label)")
-                    .font(.caption)
-                    .foregroundStyle(side == .left ? .blue : .orange)
-            } else {
-                Text("Set \(index + 1)").font(.caption)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                if let side = set.tguSide {
+                    Text("Set \(index + 1) · \(side.label)")
+                        .font(.caption)
+                        .foregroundStyle(side == .left ? .blue : .orange)
+                } else {
+                    Text("Set \(index + 1)").font(.caption)
+                }
+                Spacer()
+                if let r = set.reps { Text("\(r) reps").font(.caption) }
+                if let weight = set.weightKg {
+                    Text(formatWeight(weight)).font(.caption)
+                }
+                if let d = set.durationSeconds { Text("\(d)s").font(.caption) }
+                if showsDifficulty { Text(set.feltDifficulty.emoji) }
+                Image(systemName: "pencil")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
             }
-            Spacer()
-            if let r = set.reps            { Text("\(r) reps").font(.caption) }
-            if let d = set.durationSeconds { Text("\(d)s").font(.caption)     }
-            if showsDifficulty {
-                Text(set.feltDifficulty.emoji)
+
+            if set.preSetHeartRate != nil || set.peakHeartRate != nil || set.recoveryHeartRate != nil {
+                HStack(spacing: 8) {
+                    heartRateValue("Pre", set.preSetHeartRate)
+                    heartRateValue("Peak", set.peakHeartRate)
+                    if let excursion = set.heartRateExcursion {
+                        Text("+\(Int(excursion))").font(.caption2.monospacedDigit())
+                    }
+                    heartRateValue("Recovery", set.recoveryHeartRate)
+                    if let duration = set.recoveryDuration {
+                        Text("\(Int(duration.rounded()))s").font(.caption2.monospacedDigit())
+                    }
+                }
+                .foregroundStyle(.secondary)
             }
-            
-            Image(systemName: "pencil")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())
@@ -208,6 +273,19 @@ struct SetRow: View {
         .sheet(isPresented: $showEdit) {
             EditSetSheet(set: set)
         }
+    }
+
+    @ViewBuilder
+    private func heartRateValue(_ label: String, _ value: Double?) -> some View {
+        if let value {
+            Text("\(label) \(Int(value))").font(.caption2.monospacedDigit())
+        }
+    }
+
+    private func formatWeight(_ kilograms: Double) -> String {
+        kilograms.truncatingRemainder(dividingBy: 1) == 0
+            ? "\(Int(kilograms)) kg"
+            : "\(kilograms) kg"
     }
 }
 

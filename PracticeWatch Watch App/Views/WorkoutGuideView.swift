@@ -149,6 +149,9 @@ final class WatchActiveWorkoutStore {
     var position = WorkoutPosition.start()
     var completedExercises: [UUID: CompletedExercise] = [:]
     var nextTGUSide: TGUSide = .left
+    var currentSetStartedAt: Date?
+    var currentPreSetHeartRate: Double?
+    var recoveryStartedAt: Date?
     var workoutStarted = false
     
     private init() {}
@@ -159,12 +162,18 @@ final class WatchActiveWorkoutStore {
             position = .start()
             completedExercises = [:]
             nextTGUSide = .left
+            currentSetStartedAt = nil
+            currentPreSetHeartRate = nil
+            recoveryStartedAt = nil
         }
         workoutStarted = true
     }
     
     func markFinished() {
         activePlan = nil
+        currentSetStartedAt = nil
+        currentPreSetHeartRate = nil
+        recoveryStartedAt = nil
         workoutStarted = false
     }
 }
@@ -193,10 +202,6 @@ struct WorkoutGuideView: View {
     @State private var restTimer: Timer? = nil
     @State private var setLoggerSuggestedDuration: Int? = nil
     @State private var sessionManager = WorkoutSessionManager.shared
-    @State private var restCuePlayed = false
-    
-    // HR threshold — user can adjust on the rest screen
-    @State private var hrThresholdOverride: Double? = nil
     // Exercise timer for timed sets
     @State private var exerciseTimerSeconds: Int = 0
     @State private var exerciseTimerRunning: Bool = false
@@ -463,51 +468,67 @@ struct WorkoutGuideView: View {
     
     @ViewBuilder
     private func hrRestPhase(step: WorkoutStep) -> some View {
-        let threshold = hrThresholdOverride ?? step.hrRestThresholdBPM
-        
-        VStack(spacing: 12) {
-            Text("Rest").font(.title3.bold())
-            Image(systemName: "heart.fill")
-                .font(.largeTitle).foregroundStyle(.red).symbolEffect(.pulse)
-            Text("\(Int(sessionManager.heartRate)) bpm")
-                .font(.title.monospacedDigit())
-                .foregroundStyle(heartRateColor(sessionManager.heartRate, threshold: step.hrRestThresholdBPM))
-            HStack {
-                Text("Target: \(Int(threshold)) bpm")
-                    .font(.caption).foregroundStyle(.secondary)
-                Stepper("", value: Binding(
-                    get: { hrThresholdOverride ?? step.hrRestThresholdBPM },
-                    set: { hrThresholdOverride = $0 }
-                ), in: 80...170, step: 5)
-                .labelsHidden()
-                .frame(width: 60)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let completedSet = completedExercises[step.id]?.sets.last
+            let peak: Double? = completedSet.flatMap {
+                guard let startedAt = $0.startedAt, let endedAt = $0.endedAt else { return nil }
+                return SwingSetHeartRateLogic.peakHeartRate(
+                    setStartedAt: startedAt,
+                    setEndedAt: endedAt,
+                    nextSetStartedAt: nil,
+                    samples: sessionManager.heartRateSamples
+                )
             }
-            
-            let ready = sessionManager.heartRate > 0 && sessionManager.heartRate <= threshold
-            Button {
-                if ready { TrainingHaptic.restDone() }
-                advanceAfterRest(step: step)
-            } label: {
-                Label(ready ? "Next Set" : "Skip Rest",
-                      systemImage: ready ? "checkmark.circle.fill" : "forward.fill")
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent).tint(ready ? .green : .orange)
-        }
-        .padding(.vertical, 8)
-        .onAppear {
-            restCuePlayed = false
-        }
-        .onChange(of: sessionManager.heartRate) { _, newHR in
-            let t = hrThresholdOverride ?? step.hrRestThresholdBPM
-            if newHR <= t && newHR > 0 {
-                TrainingHaptic.restDone()
-                if !restCuePlayed {
-                    restCuePlayed = true
-                    AudioCue.shared.speak("Ready")
+            let recoverySeconds = activeWorkout.recoveryStartedAt.map {
+                max(0, Int(context.date.timeIntervalSince($0)))
+            } ?? 0
+
+            VStack(spacing: 8) {
+                Text("Recover").font(.headline)
+                HStack(alignment: .firstTextBaseline) {
+                    metricColumn("Current", value: formatHeartRate(sessionManager.heartRate))
+                    metricColumn("Peak", value: peak.map { "\(Int($0))" } ?? "—")
                 }
+                HStack {
+                    Label(formatWorkoutDuration(recoverySeconds), systemImage: "timer")
+                    Spacer()
+                    Text("Set \(position.round) / \(step.sets)")
+                }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+                if let pre = completedSet?.preSetHeartRate,
+                   let peak {
+                    Text("Pre \(Int(pre)) · excursion +\(Int(max(0, peak - pre))) bpm")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+
+                Button {
+                    declareReadyAndAdvance(step: step)
+                } label: {
+                    Label("Ready", systemImage: "checkmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
             }
+            .padding(.vertical, 6)
         }
+    }
+
+    private func metricColumn(_ label: String, value: String) -> some View {
+        VStack(spacing: 1) {
+            Text(value)
+                .font(.title2.bold().monospacedDigit())
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func formatHeartRate(_ heartRate: Double) -> String {
+        heartRate > 0 ? "\(Int(heartRate))" : "—"
     }
     
     // MARK: - Timed rest phase
@@ -584,10 +605,6 @@ struct WorkoutGuideView: View {
             .clipShape(Capsule())
     }
     
-    private func heartRateColor(_ hr: Double, threshold: Double) -> Color {
-        hr <= threshold && hr > 0 ? .green : hr > threshold * 1.1 ? .red : .orange
-    }
-    
     private func logButtonTitle(for step: WorkoutStep) -> String {
         guard step.exercise.setType == .timed, let duration = timedLogDuration(for: step) else {
             return "Log Set"
@@ -614,6 +631,17 @@ struct WorkoutGuideView: View {
     
     private func handleSetLogged(set: CompletedSet, for step: WorkoutStep) {
         TrainingHaptic.setLogged()
+
+        var loggedSet = set
+        let endDate = Date()
+        let startDate = activeWorkout.currentSetStartedAt ?? endDate
+        loggedSet.startedAt = startDate
+        loggedSet.endedAt = endDate
+        loggedSet.preSetHeartRate = activeWorkout.currentPreSetHeartRate ??
+            SwingSetHeartRateLogic.mostRecentSample(
+                atOrBefore: startDate,
+                samples: sessionManager.heartRateSamples
+            )?.beatsPerMinute
         
         if completedExercises[step.id] == nil {
             completedExercises[step.id] = CompletedExercise(
@@ -623,7 +651,10 @@ struct WorkoutGuideView: View {
                 skillLevel: skillLevel(for: step)
             )
         }
-        completedExercises[step.id]?.sets.append(set)
+        completedExercises[step.id]?.sets.append(loggedSet)
+        activeWorkout.currentSetStartedAt = nil
+        activeWorkout.currentPreSetHeartRate = nil
+        activeWorkout.recoveryStartedAt = endDate
         
         // Advance TGU side after each TGU set
         if step.exercise.name.contains("Get-Up") {
@@ -660,6 +691,28 @@ struct WorkoutGuideView: View {
         return plan.steps.filter { $0.circuitGroupID == gid }.last?.restSeconds ?? step.restSeconds
     }
     
+    private func declareReadyAndAdvance(step: WorkoutStep) {
+        guard position.phase == .hrRest else { return }
+        let nextSetStart = Date()
+        if var exercise = completedExercises[step.id], !exercise.sets.isEmpty {
+            let index = exercise.sets.index(before: exercise.sets.endIndex)
+            exercise.sets[index] = SwingSetHeartRateLogic.finalized(
+                exercise.sets[index],
+                nextSetStartedAt: nextSetStart,
+                samples: sessionManager.heartRateSamples
+            )
+            completedExercises[step.id] = exercise
+        }
+        activeWorkout.currentSetStartedAt = nextSetStart
+        activeWorkout.currentPreSetHeartRate = SwingSetHeartRateLogic.mostRecentSample(
+            atOrBefore: nextSetStart,
+            samples: sessionManager.heartRateSamples
+        )?.beatsPerMinute
+        activeWorkout.recoveryStartedAt = nil
+        TrainingHaptic.setStart()
+        advanceAfterRest(step: step)
+    }
+
     private func advanceAfterRest(step: WorkoutStep) {
         advancePosition(completedRound: position.round, step: step)
     }
@@ -919,6 +972,12 @@ struct WorkoutGuideView: View {
             do {
                 try await sessionManager.startWorkout(activityType: plan.sessionType.workoutActivityType)
                 activeWorkout.begin(plan: plan)
+                let setStart = Date()
+                activeWorkout.currentSetStartedAt = setStart
+                activeWorkout.currentPreSetHeartRate = SwingSetHeartRateLogic.mostRecentSample(
+                    atOrBefore: setStart,
+                    samples: sessionManager.heartRateSamples
+                )?.beatsPerMinute
                 TrainingHaptic.setStart()
             } catch {
                 errorState.post("Could not start workout session: \(error.localizedDescription)")
@@ -937,6 +996,7 @@ struct WorkoutGuideView: View {
             
             TrainingHaptic.workoutEnd()
             
+            finalizeHeartRateMetrics()
             let exercises = plan.steps.compactMap { completedExercises[$0.id] }
             let workout = CompletedWorkout(
                 sessionType: plan.sessionType,
@@ -965,6 +1025,23 @@ struct WorkoutGuideView: View {
         }
     }
     
+    private func finalizeHeartRateMetrics() {
+        for step in plan.steps {
+            guard var exercise = completedExercises[step.id] else { continue }
+            for index in exercise.sets.indices {
+                let nextStart = exercise.sets.indices.contains(index + 1)
+                    ? exercise.sets[index + 1].startedAt
+                    : exercise.sets[index].recoveryStartedAt
+                exercise.sets[index] = SwingSetHeartRateLogic.finalized(
+                    exercise.sets[index],
+                    nextSetStartedAt: nextStart,
+                    samples: sessionManager.heartRateSamples
+                )
+            }
+            completedExercises[step.id] = exercise
+        }
+    }
+
     private func skillLevel(for step: WorkoutStep) -> Int? {
         guard step.exercise.category == .skillProgression else { return nil }
         return settings.skillProgressions.first {
@@ -1109,7 +1186,8 @@ struct SetLoggerView: View {
                         reps: isTimed ? nil : currentReps,
                         durationSeconds: isTimed ? currentDuration : nil,
                         feltDifficulty: currentDifficulty,
-                        tguSide: tguSide
+                        tguSide: tguSide,
+                        weightKg: isKB ? kettlebellWeightKg : nil
                     )
                     if isKB {
                         WatchConnectivityManager.shared.sendKettlebellEntry(

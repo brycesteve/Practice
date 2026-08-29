@@ -40,24 +40,22 @@ public enum WorkoutData {
                 circuitGroupID: warmupGroup
             ),
             
-            // ── S&S: Swings — HR-gated rest ──────────────────────────
+            // ── S&S: Swings — athlete-declared recovery ───────────────
             WorkoutStep(
                 exercise: Exercises.kbSwing,
                 sets: 10,
                 reps: 10,
                 restSeconds: 60,
-                isHRGated: true,
-                hrRestThresholdBPM: 125
+                isHRGated: true
             ),
             
-            // ── S&S: TGU — HR-gated rest ──────────────────────────────
+            // ── S&S: TGU — athlete-declared recovery ─────────────────
             WorkoutStep(
                 exercise: Exercises.tgu,
                 sets: 10,
                 reps: 1,
                 restSeconds: 90,
-                isHRGated: true,
-                hrRestThresholdBPM: 125
+                isHRGated: true
             ),
             
             // ── Push/Pull Circuit: Push-Up + Pull-up───────────────
