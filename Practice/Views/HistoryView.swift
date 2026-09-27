@@ -7,6 +7,7 @@ import SwiftData
 
 struct HistoryView: View {
     @Binding var path: NavigationPath
+    @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var allWorkouts: [WorkoutRecord]
     @State private var filterType: SessionType? = nil
     
@@ -35,6 +36,11 @@ struct HistoryView: View {
                         NavigationLink(value: workout) {
                             WorkoutRowView(workout: workout)
                         }
+                        .swipeActions(edge: .trailing) {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                delete(workout)
+                            }
+                        }
                     }
                 }
             }
@@ -43,6 +49,11 @@ struct HistoryView: View {
         .navigationDestination(for: WorkoutRecord.self) { workout in
             WorkoutDetailView(workout: workout)
         }
+    }
+    
+    private func delete(_ workout: WorkoutRecord) {
+        modelContext.delete(workout)
+        try? modelContext.save()
     }
     
     private struct MonthSection: Identifiable {

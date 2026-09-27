@@ -23,52 +23,63 @@ public enum SkillProgressions {
             levels: [
                 SkillLevel(
                     level: 1,
-                    name: "Pike Compression Lift",
-                    details: "Lift feet briefly from seated pike.",
-                    targetReps: 10,
+                    name: "Feet-Elevated Straddle Press Drill",
+                    details: "Feet on a sofa or chair; lean forward and lift the hips to unload the feet.",
+                    targetReps: 5,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minReps: 10
+                        minReps: 5
                     )
                 ),
                 SkillLevel(
                     level: 2,
-                    name: "Crow Stand",
-                    details: "Balance knees on elbows.",
-                    targetDurationSeconds: 20,
+                    name: "Feet-Elevated Straddle Press",
+                    details: "Feet on a sofa or chair; lift both feet clear with straight arms.",
+                    targetReps: 3,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minDurationSeconds: 20
+                        minReps: 3
                     )
                 ),
                 SkillLevel(
                     level: 3,
-                    name: "Tuck Press Negative",
-                    details: "Slow lowering from handstand into tuck.",
-                    targetReps: 5,
+                    name: "Wall Straddle Press Negative",
+                    details: "From chest-to-wall handstand, lower slowly through a wide straddle.",
+                    targetReps: 3,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 4,
                         maxAverageDifficulty: 3.0,
-                        minReps: 5
+                        minReps: 3
                     )
                 ),
                 SkillLevel(
                     level: 4,
-                    name: "Box Press Handstand",
-                    details: "Use elevated feet to reduce load.",
-                    targetReps: 5,
+                    name: "Floor Straddle Press Negative",
+                    details: "Lower from a freestanding handstand to the floor with maximum control.",
+                    targetReps: 3,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 5,
                         maxAverageDifficulty: 3.0,
-                        minReps: 5
+                        minReps: 3
                     )
                 ),
                 SkillLevel(
                     level: 5,
+                    name: "Partial Straddle Press",
+                    details: "Press from the floor until both feet clearly leave it; keep arms straight.",
+                    targetReps: 3,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 6,
+                        maxAverageDifficulty: 3.5,
+                        minReps: 3
+                    )
+                ),
+                SkillLevel(
+                    level: 6,
                     name: "Straddle Press Handstand",
-                    details: "Controlled press into handstand.",
+                    details: "Complete one clean press from the floor with straight arms and control.",
                     targetReps: 1,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 6,
@@ -87,57 +98,68 @@ public enum SkillProgressions {
             levels: [
                 SkillLevel(
                     level: 1,
-                    name: "Tuck Sit",
-                    details: "Feet lifted slightly with knees tucked.",
-                    targetDurationSeconds: 20,
+                    name: "Tuck L-Sit",
+                    details: "Press tall with both feet clear and knees tucked.",
+                    targetDurationSeconds: 12,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minDurationSeconds: 20
+                        minDurationSeconds: 12
                     )
                 ),
                 SkillLevel(
                     level: 2,
-                    name: "Single Leg Extension",
-                    details: "Alternate one leg extended while maintaining lift.",
-                    targetDurationSeconds: 20,
+                    name: "Single-Leg L-Sit",
+                    details: "Hold one leg straight; alternate sides without losing hip lift.",
+                    targetDurationSeconds: 10,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minDurationSeconds: 20
+                        minDurationSeconds: 10
                     )
                 ),
                 SkillLevel(
                     level: 3,
                     name: "L-Sit",
                     details: "Legs straight, hips lifted, shoulders depressed.",
-                    targetDurationSeconds: 15,
+                    targetDurationSeconds: 10,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 4,
                         maxAverageDifficulty: 3.0,
-                        minDurationSeconds: 15
+                        minDurationSeconds: 10
                     )
                 ),
                 SkillLevel(
                     level: 4,
-                    name: "Extended L-Sit",
-                    details: "Longer hold with active compression.",
-                    targetDurationSeconds: 30,
+                    name: "High L-Sit",
+                    details: "Lift straight legs above horizontal without leaning back.",
+                    targetDurationSeconds: 8,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 4,
                         maxAverageDifficulty: 3.0,
-                        minDurationSeconds: 30
+                        minDurationSeconds: 8
                     )
                 ),
                 SkillLevel(
                     level: 5,
                     name: "V-Sit Prep",
-                    details: "Elevate legs above horizontal briefly.",
-                    targetDurationSeconds: 10,
+                    details: "Raise straight legs toward the torso with hips held high.",
+                    targetDurationSeconds: 6,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 5,
                         maxAverageDifficulty: 3.5,
-                        minDurationSeconds: 10
+                        minDurationSeconds: 6
+                    )
+                ),
+                SkillLevel(
+                    level: 6,
+                    name: "V-Sit",
+                    details: "Hold straight legs high with hips lifted and shoulders depressed.",
+                    targetDurationSeconds: 5,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 6,
+                        maxAverageDifficulty: 3.5,
+                        minDurationSeconds: 5
                     )
                 ),
             ],
@@ -153,11 +175,11 @@ public enum SkillProgressions {
                     level: 1,
                     name: "Tuck Front Lever",
                     details: "Knees tucked, hips level with shoulders.",
-                    targetDurationSeconds: 15,
+                    targetDurationSeconds: 10,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minDurationSeconds: 15
+                        minDurationSeconds: 10
                     )
                 ),
                 SkillLevel(
@@ -195,6 +217,17 @@ public enum SkillProgressions {
                 ),
                 SkillLevel(
                     level: 5,
+                    name: "Half-Lay Front Lever",
+                    details: "Extend the hips and knees partway while keeping a level body line.",
+                    targetDurationSeconds: 6,
+                    advanceCriteria: AdvanceCriteria(
+                        consecutiveSessions: 5,
+                        maxAverageDifficulty: 3.5,
+                        minDurationSeconds: 6
+                    )
+                ),
+                SkillLevel(
+                    level: 6,
                     name: "Full Front Lever",
                     details: "Body parallel with legs together.",
                     targetDurationSeconds: 5,
@@ -306,14 +339,13 @@ public enum SkillProgressions {
                 ),
                 SkillLevel(
                     level: 2,
-                    name: "Wall Handstand (Back to Wall)",
-                    details:
-                        "Back to wall. Reduce reliance on wall, engage lats and shoulders.",
-                    targetDurationSeconds: 45,
+                    name: "Wall Balance & Release",
+                    details: "Chest to wall; use controlled heel pulls for brief free balance.",
+                    targetDurationSeconds: 10,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 3,
                         maxAverageDifficulty: 2.5,
-                        minDurationSeconds: 45
+                        minDurationSeconds: 10
                     )
                 ),
                 SkillLevel(
@@ -329,7 +361,7 @@ public enum SkillProgressions {
                 ),
                 SkillLevel(
                     level: 4,
-                    name: "Freestanding Handstand (5–10s)",
+                    name: "10s Freestanding Handstand",
                     details: "Consistent holds. Focus on finger balancing.",
                     targetDurationSeconds: 10,
                     advanceCriteria: AdvanceCriteria(
@@ -340,7 +372,7 @@ public enum SkillProgressions {
                 ),
                 SkillLevel(
                     level: 5,
-                    name: "Freestanding Handstand (30s)",
+                    name: "30s Freestanding Handstand",
                     details: "Solid 30s hold with clean body line.",
                     targetDurationSeconds: 30,
                     advanceCriteria: AdvanceCriteria(
@@ -351,13 +383,13 @@ public enum SkillProgressions {
                 ),
                 SkillLevel(
                     level: 6,
-                    name: "Handstand Walk & Press",
-                    details: "Walking, pirouettes, and press from straddle.",
-                    targetDurationSeconds: 60,
+                    name: "Handstand Walking",
+                    details: "Take controlled steps while keeping shoulders tall and balance recoverable.",
+                    targetReps: 5,
                     advanceCriteria: AdvanceCriteria(
                         consecutiveSessions: 6,
                         maxAverageDifficulty: 3.0,
-                        minDurationSeconds: 60
+                        minReps: 5
                     )
                 ),
             ],

@@ -171,6 +171,9 @@ final class WatchActiveWorkoutStore {
     
     func markFinished() {
         activePlan = nil
+        position = .start()
+        completedExercises = [:]
+        nextTGUSide = .left
         currentSetStartedAt = nil
         currentPreSetHeartRate = nil
         recoveryStartedAt = nil
@@ -196,6 +199,7 @@ struct WorkoutGuideView: View {
     @State private var showPauseMenu  = false
     @State private var showEndConfirm = false
     @State private var showSummary    = false
+    @State private var summaryExercises: [CompletedExercise] = []
     @State private var isStarting     = false
     @State private var scrollProxy: ScrollViewProxy? = nil
     @State private var restSecondsRemaining = 0
@@ -272,7 +276,7 @@ struct WorkoutGuideView: View {
             if showSummary {
                 WorkoutSummaryView(
                     plan: plan,
-                    completedExercises: Array(completedExercises.values),
+                    completedExercises: summaryExercises,
                     activeCalories: sessionManager.activeCalories,
                     avgHeartRate: sessionManager.averageHeartRate,
                     elapsedSeconds: sessionManager.elapsedSeconds
@@ -362,6 +366,7 @@ struct WorkoutGuideView: View {
         let isCircuit  = circuit.count > 1
         
         progressBar
+        workoutElapsed
         
         if isCircuit {
             let posInCircuit = (circuit.firstIndex(where: { $0.id == step.id }) ?? 0) + 1
@@ -392,6 +397,15 @@ struct WorkoutGuideView: View {
         
         Text(step.displayTarget)
             .font(.subheadline).foregroundStyle(Color.accentColor)
+        
+        if let kettlebellSetDescription = kettlebellSetDescription(
+            for: step,
+            setNumber: position.round
+        ) {
+            Label(kettlebellSetDescription, systemImage: "scalemass")
+                .font(.caption.bold())
+                .foregroundStyle(.orange)
+        }
         
         if step.exercise.setType == .timed {
             exerciseTimerView(step: step)
@@ -484,6 +498,7 @@ struct WorkoutGuideView: View {
             } ?? 0
 
             VStack(spacing: 8) {
+                workoutElapsed
                 Text("Recover").font(.headline)
                 HStack(alignment: .firstTextBaseline) {
                     metricColumn("Current", value: formatHeartRate(sessionManager.heartRate))
@@ -503,6 +518,8 @@ struct WorkoutGuideView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
+                
+                nextExerciseView(after: step)
 
                 Button {
                     declareReadyAndAdvance(step: step)
@@ -536,12 +553,12 @@ struct WorkoutGuideView: View {
     @ViewBuilder
     private func timedRestPhase(step: WorkoutStep) -> some View {
         VStack(spacing: 12) {
+            workoutElapsed
             Text("Rest").font(.title3.bold())
             Text("\(restSecondsRemaining)s")
                 .font(.title.monospacedDigit().bold())
                 .foregroundStyle(restSecondsRemaining <= 5 ? .green : .primary)
-            Text("Next: \(nextExerciseName(after: step))")
-                .font(.caption2).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            nextExerciseView(after: step)
             if workoutStarted { liveMetrics }
             Button {
                 stopRestTimer()
@@ -576,10 +593,14 @@ struct WorkoutGuideView: View {
         .frame(height: 4)
     }
     
+    private var workoutElapsed: some View {
+        Label(formatWorkoutDuration(sessionManager.elapsedSeconds), systemImage: "clock")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+    }
+    
     private var liveMetrics: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(formatWorkoutDuration(sessionManager.elapsedSeconds), systemImage: "clock")
-                .foregroundStyle(.secondary)
             HStack {
                 Label("\(Int(sessionManager.heartRate)) bpm", systemImage: "heart.fill").foregroundStyle(.red)
                 Spacer()
@@ -621,10 +642,54 @@ struct WorkoutGuideView: View {
         step.exercise.category == .skillProgression || step.exercise.category == .calisthenics
     }
     
-    private func nextExerciseName(after step: WorkoutStep) -> String {
+    @ViewBuilder
+    private func nextExerciseView(after step: WorkoutStep) -> some View {
         let next = computeNextPosition(after: step, completing: position.round)
-        guard next.stepIndex < plan.steps.count else { return "Done" }
-        return plan.steps[next.stepIndex].exercise.name
+        
+        if next.stepIndex < plan.steps.count {
+            let nextStep = plan.steps[next.stepIndex]
+            VStack(spacing: 2) {
+                Text("Next: \(nextStep.exercise.name)")
+                if let description = kettlebellSetDescription(
+                    for: nextStep,
+                    setNumber: next.round
+                ) {
+                    Text(description)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.orange)
+                }
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+        } else {
+            Text("Next: Done")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func kettlebellSetDescription(for step: WorkoutStep, setNumber: Int) -> String? {
+        guard step.exercise.category == .kettlebell else { return nil }
+        
+        let isTGU = step.exercise.name.contains("Get-Up")
+        let progressionSetCount = isTGU
+            ? settings.tguProgressionSetCount
+            : settings.swingProgressionSetCount
+        let boundedProgressionSetCount = min(max(progressionSetCount, 0), step.sets) / 2 * 2
+        let middleSlots = step.sets >= 4 ? Array(3...step.sets) : []
+        let startingSlots = min(step.sets, 2) >= 1 ? Array(1...min(step.sets, 2)) : []
+        let progressionSlots = (middleSlots + startingSlots).prefix(boundedProgressionSetCount)
+        let usesProgressionWeight = progressionSlots.contains(setNumber)
+        let weight = if usesProgressionWeight {
+            isTGU ? settings.tguProgressionWeightKg : settings.swingProgressionWeightKg
+        } else {
+            isTGU ? settings.currentTGUWeightKg : settings.currentSwingWeightKg
+        }
+        
+        return usesProgressionWeight
+            ? "\(formatWeight(weight)) · Progression"
+            : formatWeight(weight)
     }
     
     // MARK: - Navigation
@@ -987,6 +1052,11 @@ struct WorkoutGuideView: View {
     }
     
     private func finishWorkout() {
+        guard workoutStarted else {
+            activeWorkout.markFinished()
+            return
+        }
+        
         Task {
             var hkUUID: UUID?
             if workoutStarted {
@@ -998,6 +1068,7 @@ struct WorkoutGuideView: View {
             
             finalizeHeartRateMetrics()
             let exercises = plan.steps.compactMap { completedExercises[$0.id] }
+            summaryExercises = exercises
             let workout = CompletedWorkout(
                 sessionType: plan.sessionType,
                 startDate: Date().addingTimeInterval(-Double(sessionManager.elapsedSeconds)),

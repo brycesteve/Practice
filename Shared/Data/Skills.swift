@@ -186,6 +186,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
     -> [WorkoutStep]
     {
         let warmupGroup = UUID()
+        let isTimedProgression = currentLevel?.targetDurationSeconds != nil || currentLevel == nil
+        let progressionDuration = currentLevel?.targetDurationSeconds ?? 30
+        let progressionReps = currentLevel?.targetReps ?? 5
        
         return [
             WorkoutStep(
@@ -221,16 +224,20 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 exercise: Exercise(
                     name: currentLevel?.name ?? "Wall Handstand Hold",
                     category: .skillProgression,
-                    setType: .timed,
+                    setType: isTimedProgression ? .timed : .reps,
                     defaultSets: 5,
-                    defaultDuration: currentLevel?.targetDurationSeconds ?? 30,
+                    defaultReps: isTimedProgression ? nil : progressionReps,
+                    defaultDuration: isTimedProgression ? progressionDuration : nil,
                     notes: currentLevel?.details
                     ?? "Hold against wall, chest to wall"
                 ),
                 sets: 5,
-                durationSeconds: currentLevel?.targetDurationSeconds ?? 30,
+                reps: isTimedProgression ? nil : progressionReps,
+                durationSeconds: isTimedProgression ? progressionDuration : nil,
                 restSeconds: 90,
-                notes: "Log your best hold time each attempt."
+                notes: isTimedProgression
+                    ? "Log your best clean hold and difficulty."
+                    : "Log controlled steps and difficulty."
             )
         ] + handstandStretches()
     }
@@ -316,21 +323,6 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 restSeconds: 20,
                 circuitGroupID: warmupGroup
             ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "False Grip Dead Hang",
-                    category: .warmup,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 15,
-                    notes: "Wrist over the ring"
-                ),
-                sets: 2,
-                durationSeconds: 15,
-                restSeconds: 30,
-                circuitGroupID: warmupGroup
-            ),
-            
             WorkoutStep(
                 exercise: Exercise(
                     name: currentLevel?.name ?? "Ring Support Hold",
@@ -433,12 +425,12 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                     category: .skillProgression,
                     setType: .timed,
                     defaultSets: 5,
-                    defaultDuration: currentLevel?.targetDurationSeconds ?? 15,
+                    defaultDuration: currentLevel?.targetDurationSeconds ?? 10,
                     notes: currentLevel?.details
                     ?? "Knees tucked. Hips in line with elbows"
                 ),
                 sets: 5,
-                durationSeconds: currentLevel?.targetDurationSeconds ?? 15,
+                durationSeconds: currentLevel?.targetDurationSeconds ?? 10,
                 restSeconds: 120,
                 notes: "Log actual hold time and difficulty."
             ),
@@ -544,15 +536,15 @@ public enum Skill: String, RawRepresentable, CaseIterable {
         return [
             WorkoutStep(
                 exercise: Exercise(
-                    name: "Pike Compression pulses",
+                    name: "Pike Compression Pulses",
                     category: .warmup,
-                    setType: .timed,
+                    setType: .reps,
                     defaultSets: 2,
-                    defaultDuration: 20,
+                    defaultReps: 10,
                     notes: "Pike sit and lift feet"
                 ),
                 sets: 2,
-                durationSeconds: 20,
+                reps: 10,
                 restSeconds: 15,
                 circuitGroupID: warmupGroup
             ),
@@ -580,33 +572,17 @@ public enum Skill: String, RawRepresentable, CaseIterable {
             ),
             WorkoutStep(
                 exercise: Exercise(
-                    name: "Crow pose hold",
-                    category: .warmup,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 20,
-                    notes: "Crow pose"
-                ),
-                sets: 2,
-                durationSeconds: 20,
-                restSeconds: 30,
-                circuitGroupID: warmupGroup
-            ),
-        
-            
-            WorkoutStep(
-                exercise: Exercise(
-                    name: currentLevel?.name ?? "Pike compression lift",
+                    name: currentLevel?.name ?? "Feet-Elevated Straddle Press Drill",
                     category: .skillProgression,
                     setType: .reps,
                     defaultSets: 5,
-                    defaultReps: currentLevel?.targetReps ?? 10,
+                    defaultReps: currentLevel?.targetReps ?? 5,
                     notes: currentLevel?.details
-                    ?? "Lift feet briefly from seated pike."
+                    ?? "Feet on a sofa or chair; lean forward and lift the hips to unload the feet."
                 ),
                 sets: 5,
-                reps: currentLevel?.targetReps ?? 10,
-                restSeconds: 60,
+                reps: currentLevel?.targetReps ?? 5,
+                restSeconds: 90,
                 notes: "Log actual reps and difficulty."
             ),
             
@@ -659,4 +635,3 @@ public enum Skill: String, RawRepresentable, CaseIterable {
 
 
 }
-
