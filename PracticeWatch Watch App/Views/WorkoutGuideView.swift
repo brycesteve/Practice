@@ -196,6 +196,7 @@ struct WorkoutGuideView: View {
     @State private var settings = AppGroupDefaults.shared.loadAppContext()
     @State private var activeWorkout = WatchActiveWorkoutStore.shared
     
+    @State private var strengthLoad: Double?
     @State private var showSetLogger  = false
     @State private var showPauseMenu  = false
     @State private var showEndConfirm = false
@@ -267,6 +268,8 @@ struct WorkoutGuideView: View {
         }
     }
     
+    private var isJointStretches: Bool { plan.sessionType == .jointStretches }
+
     private var isTGU: Bool {
         currentStep?.exercise.name.contains("Get-Up") ?? false
     }
@@ -336,17 +339,26 @@ struct WorkoutGuideView: View {
             Button("Cancel", role: .cancel) {}
         }
         .alert("End workout?", isPresented: $showEndConfirm) {
-            Button("End & Save", role: .destructive) { finishWorkout() }
+            Button("End & Save", role: .destructive) {
+                if isJointStretches, let step = currentStep {
+                    handleSetLogged(set: CompletedSet(durationSeconds: max(1, sessionManager.elapsedSeconds)), for: step)
+                } else { finishWorkout() }
+            }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Logged activity will be saved. A session with no completed activity will be discarded.")
         }
+        .onChange(of: currentStep?.id, initial: true) { _, _ in
+            strengthLoad = currentStep?.strengthLoadKey.flatMap { AppGroupDefaults.shared.strengthLoad(for: $0) }
+        }
         .navigationBarBackButtonHidden(workoutStarted)
         .toolbar {
 #if DEBUG
-            ToolbarItem(placement: .topBarLeading) {
-                Button { AudioCue.shared.speak("Ready") } label: {
-                    Image(systemName: "speaker.wave.2")
+            if !isJointStretches {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { AudioCue.shared.speak("Ready") } label: {
+                        Image(systemName: "speaker.wave.2")
+                    }
                 }
             }
 #endif
@@ -367,7 +379,7 @@ struct WorkoutGuideView: View {
         let circuit    = circuitSteps(for: step)
         let isCircuit  = circuit.count > 1
         
-        progressBar
+        if !isJointStretches { progressBar }
         workoutElapsed
         
         if isCircuit {
@@ -375,12 +387,12 @@ struct WorkoutGuideView: View {
             Label("Round \(position.round)/\(step.sets) · Ex \(posInCircuit)/\(circuit.count)",
                   systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
             .font(.caption2).foregroundStyle(.secondary)
-        } else {
+        } else if !isJointStretches {
             Text("Set \(position.round) of \(step.sets)")
                 .font(.caption2).foregroundStyle(.secondary)
         }
         
-        categoryBadge(step.exercise.category)
+        if !isJointStretches { categoryBadge(step.exercise.category) }
         
         // TGU shows next side
         if step.exercise.name.contains("Get-Up") {
@@ -409,7 +421,22 @@ struct WorkoutGuideView: View {
                 .foregroundStyle(.orange)
         }
         
-        if step.exercise.setType == .timed {
+        if step.strengthLoadKey != nil {
+            Picker("Load", selection: $strengthLoad) {
+                Text("Choose comfortable load").tag(Optional<Double>.none)
+                ForEach(WorkoutData.strengthWeights, id: \.self) { weight in
+                    Text(formatWeight(weight)).tag(Optional(weight))
+                }
+            }
+            .font(.caption)
+            .onChange(of: strengthLoad) { _, weight in
+                if let key = step.strengthLoadKey, let weight {
+                    AppGroupDefaults.shared.saveStrengthLoad(weight, for: key)
+                }
+            }
+        }
+
+        if step.exercise.setType == .timed && !isJointStretches {
             exerciseTimerView(step: step)
         }
         
@@ -419,12 +446,17 @@ struct WorkoutGuideView: View {
                 .foregroundStyle(.secondary)
         }
         
-        if let notes = step.exercise.notes {
+        if let notes = step.exercise.notes, !isJointStretches {
             Text(notes)
                 .font(.caption2).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         
+        if let notes = step.notes {
+            Text(notes).font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+
         // Logged sets this exercise
         let logged = completedExercises[step.id]?.sets ?? []
         if !logged.isEmpty {
@@ -461,6 +493,10 @@ struct WorkoutGuideView: View {
             }
             else {
                 Button {
+                    if isJointStretches {
+                        handleSetLogged(set: CompletedSet(durationSeconds: max(1, sessionManager.elapsedSeconds)), for: step)
+                        return
+                    }
                     TrainingHaptic.setStart()
                     setLoggerSuggestedDuration = timedLogDuration(for: step)
                     if step.exercise.setType == .timed {
@@ -468,14 +504,16 @@ struct WorkoutGuideView: View {
                     }
                     showSetLogger = true
                 } label: {
-                    Label(logButtonTitle(for: step), systemImage: "checkmark.circle").frame(maxWidth: .infinity)
+                    Label(isJointStretches ? "Finish" : logButtonTitle(for: step), systemImage: "checkmark.circle").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 
-                Button { skipStep() } label: {
-                    Label("Skip", systemImage: "forward.fill").frame(maxWidth: .infinity)
+                if !isJointStretches {
+                    Button { skipStep() } label: {
+                        Label("Skip", systemImage: "forward.fill").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
         }
     }
@@ -641,7 +679,7 @@ struct WorkoutGuideView: View {
     }
     
     private func recordsDifficulty(for step: WorkoutStep) -> Bool {
-        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics
+        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics || step.strengthLoadKey != nil
     }
     
     @ViewBuilder
@@ -672,9 +710,9 @@ struct WorkoutGuideView: View {
     }
     
     private func kettlebellSetDescription(for step: WorkoutStep, setNumber: Int) -> String? {
-        guard step.exercise.category == .kettlebell else { return nil }
+        guard let type = step.exercise.simpleSinisterType else { return nil }
         
-        let isTGU = step.exercise.name.contains("Get-Up")
+        let isTGU = type == .tgu
         let progressionSetCount = isTGU
             ? settings.tguProgressionSetCount
             : settings.swingProgressionSetCount
@@ -699,6 +737,7 @@ struct WorkoutGuideView: View {
     private func handleSetLogged(set: CompletedSet, for step: WorkoutStep) {
         TrainingHaptic.setLogged()
 
+        if step.strengthLoadKey != nil { strengthLoad = set.weightKg }
         var loggedSet = set
         let endDate = Date()
         let startDate = activeWorkout.currentSetStartedAt ?? endDate
@@ -1146,6 +1185,7 @@ struct SetLoggerView: View {
     let suggestedDurationSeconds: Int?
     let onComplete: (CompletedSet) -> Void
     
+    @State private var selectedStrengthWeight: Double?
     @State private var currentReps: Int = 0
     @State private var currentDuration: Int = 0
     @State private var currentDifficulty: DifficultyRating = .moderate
@@ -1153,12 +1193,12 @@ struct SetLoggerView: View {
     @Environment(\.dismiss) private var dismiss
     
     private var isTimed: Bool { step.exercise.setType == .timed }
-    private var isKB: Bool    { step.exercise.category == .kettlebell }
+    private var isKB: Bool { step.exercise.simpleSinisterType != nil }
     private var recordsDifficulty: Bool {
-        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics
+        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics || step.strengthLoadKey != nil
     }
     private var kettlebellExerciseType: KettlebellExerciseType {
-        step.exercise.name.contains("Get-Up") ? .tgu : .swing
+        step.exercise.simpleSinisterType ?? .swing
     }
     private var usesProgressionWeight: Bool {
         progressionSetSlots(totalSets: step.sets, progressionSetCount: progressionSetCount)
@@ -1206,6 +1246,15 @@ struct SetLoggerView: View {
                 Text("Set \(existingSets.count + 1) of \(step.sets)")
                     .font(.caption).foregroundStyle(.secondary)
                 
+                if step.strengthLoadKey != nil {
+                    Picker("Load", selection: $selectedStrengthWeight) {
+                        Text("Choose comfortable load").tag(Optional<Double>.none)
+                        ForEach(WorkoutData.strengthWeights, id: \.self) { weight in
+                            Text(formatWeight(weight)).tag(Optional(weight))
+                        }
+                    }
+                    .font(.caption)
+                }
                 if isKB {
                     HStack {
                         Label("Weight", systemImage: "scalemass")
@@ -1256,7 +1305,7 @@ struct SetLoggerView: View {
                         durationSeconds: isTimed ? currentDuration : nil,
                         feltDifficulty: currentDifficulty,
                         tguSide: tguSide,
-                        weightKg: isKB ? kettlebellWeightKg : nil
+                        weightKg: isKB ? kettlebellWeightKg : (step.strengthLoadKey != nil ? selectedStrengthWeight : nil)
                     )
                     if isKB {
                         WatchConnectivityManager.shared.sendKettlebellEntry(
@@ -1266,11 +1315,15 @@ struct SetLoggerView: View {
                             reps: currentReps
                         )
                     }
+                    if let key = step.strengthLoadKey, let weight = selectedStrengthWeight {
+                        AppGroupDefaults.shared.saveStrengthLoad(weight, for: key)
+                    }
                     onComplete(s)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
-                
+                .disabled((step.strengthLoadKey != nil && selectedStrengthWeight == nil) || (isTimed ? currentDuration <= 0 : currentReps <= 0))
+
                 if !existingSets.isEmpty {
                     Divider()
                     ForEach(existingSets.indices, id: \.self) { i in
@@ -1292,6 +1345,7 @@ struct SetLoggerView: View {
         }
         .onAppear {
             settings = AppGroupDefaults.shared.loadAppContext()
+            selectedStrengthWeight = step.strengthLoadKey.flatMap { AppGroupDefaults.shared.strengthLoad(for: $0) }
         }
     }
     
@@ -1323,3 +1377,17 @@ struct SetLoggerView: View {
 }
 
 #endif
+
+#Preview("Strength A") {
+    NavigationStack {
+        WorkoutGuideView(plan: WorkoutData.plan(for: .strengthA))
+            .environment(ErrorState())
+    }
+}
+
+#Preview("Joint Stretches") {
+    NavigationStack {
+        WorkoutGuideView(plan: WorkoutData.plan(for: .jointStretches))
+            .environment(ErrorState())
+    }
+}

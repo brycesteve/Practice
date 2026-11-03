@@ -10,8 +10,24 @@ import Foundation
 struct AppGroupDefaults {
     public static let shared = AppGroupDefaults()
     
-    private let defaults = UserDefaults(suiteName: "group.net.stevebryce.practice")
+    private let defaults: UserDefaults?
+
+    init(defaults: UserDefaults? = UserDefaults(suiteName: "group.net.stevebryce.practice")) {
+        self.defaults = defaults
+    }
     
+    // Watch-local preferences are independent of phone sync and never replace S&S settings.
+    func strengthLoad(for key: String) -> Double? {
+        guard let value = defaults?.object(forKey: "strengthLoad.\(key)") as? Double,
+              value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    func saveStrengthLoad(_ weight: Double, for key: String) {
+        guard weight.isFinite, weight > 0 else { return }
+        defaults?.set(weight, forKey: "strengthLoad.\(key)")
+    }
+
     func saveAppContext(_ data: WCSyncPayload) {
         var data = data
 #if os(watchOS)

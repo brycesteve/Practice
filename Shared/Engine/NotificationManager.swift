@@ -31,12 +31,24 @@ public final class NotificationManager: Sendable {
     // MARK: - Training reminders
     
     public func scheduleMorningReminder(hour: Int, minute: Int) {
-        let content = UNMutableNotificationContent()
-        content.title = "☀️ Morning Session"
-        content.body  = "Simple & Sinister time. 10 × 10 swings, 10 get-ups. Let's go."
-        content.sound = .default
-        schedule(content: content, id: ID.morningReminder, hour: hour, minute: minute, repeats: true)
+        // Replace the legacy daily S&S reminder with weekday-specific prescriptions.
+        center.removePendingNotificationRequests(withIdentifiers: [ID.morningReminder] + morningScheduleIDs)
+        for weekday in 2...7 {
+            guard let type = WorkoutData.scheduledSession(weekday: weekday) else { continue }
+            let content = UNMutableNotificationContent()
+            content.title = type.displayName
+            switch type {
+            case .morning: content.body = "Warm-up, 100 swings and 10 alternating get-ups. Rest until recovered."
+            case .strengthA, .strengthB: content.body = "Your strength session is ready on the Watch. Leave 2–3 reps in reserve."
+            default: content.body = "Your common stretching sequence is ready."
+            }
+            content.sound = .default
+            schedule(content: content, id: "\(ID.morningReminder).\(weekday)", hour: hour,
+                     minute: minute, weekday: weekday, repeats: true)
+        }
     }
+
+    private var morningScheduleIDs: [String] { (2...7).map { "\(ID.morningReminder).\($0)" } }
     
     public func scheduleEveningReminder(hour: Int, minute: Int, skillFocus: String) {
         let content = UNMutableNotificationContent()
@@ -109,7 +121,7 @@ public final class NotificationManager: Sendable {
     public func cancelAllReminders() {
         center.removePendingNotificationRequests(withIdentifiers: [
             ID.morningReminder, ID.eveningReminder, ID.weighInReminder
-        ])
+        ] + morningScheduleIDs)
     }
     
     // MARK: - Helpers

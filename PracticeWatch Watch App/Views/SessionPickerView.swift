@@ -4,6 +4,8 @@ import SwiftUI
 import SwiftData
 
 struct SessionPickerView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var programmeDate = Date()
     @Environment(ErrorState.self) private var errorState
     @State private var settings = AppGroupDefaults.shared.loadAppContext()
     @State private var activeWorkout = WatchActiveWorkoutStore.shared
@@ -13,6 +15,11 @@ struct SessionPickerView: View {
         settings.restDays.contains { Calendar.current.isDateInToday($0) }
     }
     
+    private var scheduledSession: SessionType? { WorkoutData.scheduledSession(on: programmeDate) }
+    private var offeredSessions: [SessionType] {
+        [scheduledSession, .jointStretches, .evening].compactMap { $0 }
+    }
+
     private var rotationLabel: String {
         let names = Skill.activeSkills.map { $0.rawValue }
         return "Evening: \(names[EveningRotation.normalized(settings.eveningRotationDay)])"
@@ -30,7 +37,13 @@ struct SessionPickerView: View {
                     }
                     
                     // MARK: - Session Tiles
-                    ForEach(SessionType.allCases, id: \ .self) { type in
+                    if scheduledSession == nil {
+                        Text("Sunday · Rest")
+                            .font(.headline)
+                        Text("No scheduled strength training.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(offeredSessions, id: \.self) { type in
                         NavigationLink(value: type) {
                             sessionTile(for: type)
                         }
@@ -103,8 +116,15 @@ struct SessionPickerView: View {
                 }
             }
             .onAppear {
+                programmeDate = .now
                 settings = AppGroupDefaults.shared.loadAppContext()
                 requestSyncIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { programmeDate = .now }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                programmeDate = .now
             }
             .onReceive(NotificationCenter.default.publisher(for: .syncPayloadReceived)) { _ in
                 settings = AppGroupDefaults.shared.loadAppContext()
@@ -150,7 +170,7 @@ struct SessionPickerView: View {
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(type.displayName)
+                Text(type == scheduledSession ? "Today: \(type.displayName)" : type.displayName)
                     .font(.caption).fontWeight(.semibold)
                 Text(config.subtitle)
                     .font(.caption2)
@@ -172,9 +192,15 @@ struct SessionPickerView: View {
     private func sessionConfig(for type: SessionType) -> (icon: String, tint: Color, subtitle: String) {
         switch type {
         case .morning:
-            return ("sunrise.fill", .yellow, "Strength & conditioning")
+            return ("sunrise.fill", .yellow, "Warm-up · 100 swings · 10 get-ups")
         case .evening:
             return ("moon.stars", .indigo, "Skill & mobility")
+        case .strengthA, .strengthB:
+            return ("figure.strengthtraining.functional", .orange, "Controlled strength · 2–3 reps in reserve")
+        case .mobility:
+            return ("figure.flexibility", .green, "Common stretching sequence")
+        case .jointStretches:
+            return ("figure.mind.and.body", .mint, "Morning mobility · at your own pace")
         }
     }
     
@@ -218,27 +244,10 @@ struct SessionPickerView: View {
     // MARK: - Session Plan
     
     private func plan(for type: SessionType) -> SessionPlan {
-        let valueProgressions = settings.skillProgressions
-        
-        switch type {
-        case .morning:
-            return SessionPlan(
-                sessionType: .morning,
-                steps: WorkoutData.morningSteps,
-                estimatedDurationMinutes: 60
-            )
-        case .evening:
-            return SessionPlan(
-                sessionType: .evening,
-                steps: WorkoutData.eveningSteps(
-                    rotationDay: settings.eveningRotationDay,
-                    progressions: valueProgressions
-                ),
-                estimatedDurationMinutes: 30
-            )
-        }
+        WorkoutData.plan(for: type, rotationDay: settings.eveningRotationDay,
+                         progressions: settings.skillProgressions)
     }
-    
+
     // MARK: - Sync
     
     private func requestSyncIfNeeded() {

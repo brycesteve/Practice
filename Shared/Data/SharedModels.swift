@@ -9,17 +9,25 @@ import HealthKit
 public enum SessionType: String, Codable, CaseIterable, Sendable {
     case morning = "Morning"
     case evening = "Evening"
+    case strengthA = "Strength A"
+    case strengthB = "Strength B"
+    case mobility = "Mobility"
+    case jointStretches = "Joint Stretches"
     
-    public var displayName: String { rawValue }
+    public var displayName: String { self == .morning ? "Simple & Sinister" : rawValue }
     public var emoji: String {
         switch self {
         case .morning: return "☀️"
         case .evening: return "🌙"
+        case .strengthA, .strengthB: return "💪"
+        case .mobility, .jointStretches: return "🧘"
         }
     }
     public var workoutActivityType: HKWorkoutActivityType {
-        // Both are functional strength training
-        return .functionalStrengthTraining
+        switch self {
+        case .mobility, .jointStretches: return .flexibility
+        default: return .functionalStrengthTraining
+        }
     }
 }
 
@@ -83,6 +91,16 @@ public struct Exercise: Identifiable, Codable, Sendable, Hashable {
     }
 }
 
+extension Exercise {
+    public var simpleSinisterType: KettlebellExerciseType? {
+        switch name {
+        case "Kettlebell Swing": return .swing
+        case "Turkish Get-Up": return .tgu
+        default: return nil
+        }
+    }
+}
+
 // MARK: - Workout Session (plan)
 
 public struct WorkoutStep: Identifiable, Codable, Sendable {
@@ -98,14 +116,21 @@ public struct WorkoutStep: Identifiable, Codable, Sendable {
     /// Steps in the same circuit are cycled round-by-round rather than all-sets-then-next.
     public var circuitGroupID: UUID?
     
-    /// If true, rest after this set is HR-gated: user sees live BPM and a "Ready" button
-    /// that unlocks once HR drops below `hrRestThresholdBPM`.
+    /// Legacy wire name: show live BPM and an unrestricted athlete-controlled Ready button.
     public var isHRGated: Bool
     
-    /// BPM threshold below which the "Ready" button unlocks. Default 130.
+    /// Legacy wire field retained for compatibility. Does not gate readiness.
     public var hrRestThresholdBPM: Double
     
+    /// Optional additions decode as nil in older plans.
+    public var repUpperBound: Int?
+    public var strengthLoadKey: String?
+
     public var displayTarget: String {
+        if let reps, let repUpperBound { return "\(sets) × \(reps)–\(repUpperBound) reps" }
+        if exercise.setType == .timed && durationSeconds == nil && exercise.defaultDuration == nil {
+            return "At your own pace"
+        }
         if let reps { return "\(sets) × \(reps) reps" }
         if let dur  { return "\(sets) × \(dur)s" }
         return "\(sets) sets"
@@ -123,7 +148,9 @@ public struct WorkoutStep: Identifiable, Codable, Sendable {
         notes: String? = nil,
         circuitGroupID: UUID? = nil,
         isHRGated: Bool = false,
-        hrRestThresholdBPM: Double = 130
+        hrRestThresholdBPM: Double = 130,
+        repUpperBound: Int? = nil,
+        strengthLoadKey: String? = nil
     ) {
         self.id = id
         self.exercise = exercise
@@ -135,6 +162,8 @@ public struct WorkoutStep: Identifiable, Codable, Sendable {
         self.circuitGroupID = circuitGroupID
         self.isHRGated = isHRGated
         self.hrRestThresholdBPM = hrRestThresholdBPM
+        self.repUpperBound = repUpperBound
+        self.strengthLoadKey = strengthLoadKey
     }
 }
 

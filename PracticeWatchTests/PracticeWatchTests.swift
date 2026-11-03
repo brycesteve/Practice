@@ -136,3 +136,53 @@ struct SwingSetHeartRateLogicTests {
         )
     }
 }
+
+@Suite("Trial programme on Watch", .serialized)
+@MainActor
+struct WatchTrialProgrammeTests {
+    @Test func resumeKeepsTheChosenPlanAndRecordedSets() throws {
+        let store = WatchActiveWorkoutStore.shared
+        store.markFinished()
+        defer { store.markFinished() }
+        let plan = WorkoutData.plan(for: .strengthB)
+        store.begin(plan: plan)
+        store.position = WorkoutPosition(stepIndex: 1, round: 2, phase: .hrRest)
+        store.completedExercises[plan.steps[0].id] = CompletedExercise(
+            exerciseID: plan.steps[0].exercise.id, exerciseName: plan.steps[0].exercise.name,
+            sets: [CompletedSet(reps: 5, weightKg: 8)])
+        store.begin(plan: plan)
+        #expect(store.activePlan?.id == plan.id)
+        #expect(store.position == WorkoutPosition(stepIndex: 1, round: 2, phase: .hrRest))
+        #expect(store.completedExercises[plan.steps[0].id]?.sets.first?.weightKg == 8)
+        #expect(store.workoutStarted)
+    }
+
+    @Test func independentLoadsSurviveRelaunchAndPhoneSync() throws {
+        let suite = "PracticeTrialLoadTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let cache = AppGroupDefaults(defaults: defaults)
+        #expect(cache.strengthLoad(for: "cleanPress") == nil)
+        cache.saveStrengthLoad(8, for: "cleanPress")
+        cache.saveStrengthLoad(16, for: "gobletSquat")
+        cache.saveAppContext(WCSyncPayload(currentSwingWeightKg: 24, currentTGUWeightKg: 24))
+        let relaunched = AppGroupDefaults(defaults: defaults)
+        #expect(relaunched.strengthLoad(for: "cleanPress") == 8)
+        #expect(relaunched.strengthLoad(for: "gobletSquat") == 16)
+        #expect(relaunched.loadAppContext().currentSwingWeightKg == 24)
+        #expect(relaunched.loadAppContext().currentTGUWeightKg == 24)
+        relaunched.saveStrengthLoad(.nan, for: "cleanPress")
+        relaunched.saveStrengthLoad(-1, for: "cleanPress")
+        #expect(relaunched.strengthLoad(for: "cleanPress") == 8)
+    }
+
+    @Test func onlySwingsAndGetUpsUseSimpleSinisterProgression() {
+        for step in WorkoutData.strengthASteps + WorkoutData.strengthBSteps {
+            #expect(step.exercise.simpleSinisterType == nil)
+            #expect(step.isHRGated)
+        }
+        #expect(Exercises.kbSwing.simpleSinisterType == .swing)
+        #expect(Exercises.tgu.simpleSinisterType == .tgu)
+        #expect(WorkoutData.plan(for: .jointStretches).steps.count == 1)
+    }
+}

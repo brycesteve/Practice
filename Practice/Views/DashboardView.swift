@@ -16,6 +16,8 @@ struct DashboardView: View {
     @Query(sort: \RecoveryScoreRecord.date, order: .reverse)
     private var recoveryHistory: [RecoveryScoreRecord]
     
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var programmeDate = Date()
     @State private var latestWeightKg: Double? = nil
     @State private var latestVO2Max: Double?   = nil
     @State private var recoveryScore: RecoveryScore? = nil
@@ -71,8 +73,11 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
+                    TodayProgrammeView(type: WorkoutData.scheduledSession(on: programmeDate))
+
                     // Today
-                    if todayWorkouts.isEmpty { noWorkoutCard } else { todayCard }
+                    if !todayWorkouts.isEmpty { todayCard }
+                    else if WorkoutData.scheduledSession(on: programmeDate) != nil { noWorkoutCard }
                     
                     // Recovery card
                     recoveryCard
@@ -100,6 +105,12 @@ struct DashboardView: View {
                     latestVO2Max = try? await vo2
                     await loadCachedRecoveryScore()
                 }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { programmeDate = .now }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                programmeDate = .now
             }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
@@ -539,6 +550,7 @@ struct DashboardView: View {
             let isFuture = date > today
             let worked  = allWorkouts.contains { cal.isDate($0.startDate, inSameDayAs: date) }
             let rested  = restDays.contains    { cal.isDate($0.date,      inSameDayAs: date) }
+                || WorkoutData.scheduledSession(on: date, calendar: cal) == nil
             let label   = cal.shortWeekdaySymbols[cal.component(.weekday, from: date) - 1]
             let state: DayState = isFuture ? .future : worked ? .trained : rested ? .rest : .missed
             return DaySummary(date: date, label: label, state: state)
@@ -587,4 +599,51 @@ struct StatCard: View {
         .padding().frame(maxWidth: .infinity, alignment: .leading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
+}
+
+/// Read-only prescription; safe to preview without opening a store or starting HealthKit.
+private struct TodayProgrammeView: View {
+    let type: SessionType?
+
+    var body: some View {
+        CardView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Today's programme").font(.caption).foregroundStyle(.secondary)
+                if let type {
+                    Text(type.displayName).font(.headline)
+                    ForEach(WorkoutData.plan(for: type).steps) { step in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(step.exercise.name) · \(step.displayTarget)")
+                                .font(.caption)
+                            if let notes = step.exercise.notes {
+                                Text(notes).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    if type == .strengthA || type == .strengthB {
+                        Text(WorkoutData.strengthGuidance).font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("Rest").font(.headline)
+                    Text("No scheduled strength training.").font(.caption)
+                }
+                Text("Morning: Joint Stretches · at your own pace")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("Record sessions on your Watch.").font(.caption2).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+#Preview("Strength A") {
+    ScrollView { TodayProgrammeView(type: .strengthA) }
+}
+
+#Preview("Strength B") {
+    ScrollView { TodayProgrammeView(type: .strengthB) }
+}
+
+#Preview("Sunday rest") {
+    TodayProgrammeView(type: nil)
 }

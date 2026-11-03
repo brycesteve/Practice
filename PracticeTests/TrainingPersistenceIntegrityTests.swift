@@ -91,3 +91,38 @@ struct TrainingPersistenceIntegrityTests {
         #expect(!workout.isMeaningfulTraining)
     }
 }
+
+@Suite("Trial workout persistence")
+@MainActor
+struct TrialWorkoutPersistenceTests {
+    @Test func storedSetsRetainLoadAndAllHeartRateTimingFields() throws {
+        let store = try ModelContainer(for: Schema(CurrentSchema.models),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+        let start = Date(timeIntervalSinceReferenceDate: 10000)
+        let set = CompletedSet(reps: 5, feltDifficulty: .easy, weightKg: 8,
+            startedAt: start, endedAt: start.addingTimeInterval(10), preSetHeartRate: 110,
+            peakHeartRate: 135, recoveryHeartRate: 115, recoveryStartedAt: start.addingTimeInterval(100))
+        for type in [SessionType.morning, .evening, .strengthA, .strengthB, .mobility, .jointStretches] {
+            let workout = CompletedWorkout(sessionType: type, startDate: start, endDate: start.addingTimeInterval(120),
+                exercises: [.init(exerciseID: UUID(), exerciseName: "Recorded exercise", sets: [set])], averageHeartRate: 120)
+            #expect(try TrainingHistoryIntegrity.insertWorkout(workout, into: store))
+            let id = workout.id
+            let record = try #require(store.mainContext.fetch(FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.id == id })).first)
+            let restored = record.toCompletedWorkout()
+            let restoredSet = try #require(restored.exercises.first?.sets.first)
+            #expect(restored.sessionType == type)
+            #expect(restored.averageHeartRate == 120)
+            #expect(restoredSet.id == set.id)
+            #expect(restoredSet.weightKg == 8)
+            #expect(restoredSet.reps == 5)
+            #expect(restoredSet.feltDifficulty == .easy)
+            #expect(restoredSet.startedAt == set.startedAt)
+            #expect(restoredSet.endedAt == set.endedAt)
+            #expect(restoredSet.preSetHeartRate == 110)
+            #expect(restoredSet.peakHeartRate == 135)
+            #expect(restoredSet.recoveryHeartRate == 115)
+            #expect(restoredSet.recoveryStartedAt == set.recoveryStartedAt)
+        }
+        #expect(try store.mainContext.fetchCount(FetchDescriptor<WorkoutRecord>()) == 6)
+    }
+}

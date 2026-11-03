@@ -61,10 +61,10 @@ public enum Skill: String, RawRepresentable, CaseIterable {
         case .pressHandstand: return pressHandstandRoutine(currentLevel: currentLevel)
         }}()
         
-        return routine + coreStretches()
+        return routine + Self.commonStretches()
     }
     
-    private func coreStretches() -> [WorkoutStep] {
+    static func commonStretches() -> [WorkoutStep] {
         [
             WorkoutStep(
                 exercise: Exercises.ninetyNinety,

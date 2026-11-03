@@ -26,7 +26,7 @@ struct HistoryView: View {
                         Text(t.displayName).tag(Optional(t))
                     }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
             }
             .listRowBackground(Color.clear)
             

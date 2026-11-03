@@ -259,7 +259,10 @@ enum TrainingSchemaV2: VersionedSchema {
         public func toCompletedSet() -> CompletedSet {
             CompletedSet(
                 id: id, reps: reps, durationSeconds: durationSeconds,
-                feltDifficulty: feltDifficulty, tguSide: tguSide
+                feltDifficulty: feltDifficulty, tguSide: tguSide,
+                weightKg: weightKg, startedAt: startedAt, endedAt: endedAt,
+                preSetHeartRate: preSetHeartRate, peakHeartRate: peakHeartRate,
+                recoveryHeartRate: recoveryHeartRate, recoveryStartedAt: recoveryStartedAt
             )
         }
         

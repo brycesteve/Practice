@@ -82,6 +82,11 @@ struct TrainingApp: App {
         WatchConnectivityManager.shared.delegate = wcDelegate
         WatchConnectivityManager.shared.activate()
         
+        if let settings = try? container.mainContext.fetch(FetchDescriptor<AppSettings>()).first,
+           settings.notificationsEnabled {
+            NotificationManager.shared.scheduleMorningReminder(hour: settings.morningReminderHour,
+                                                               minute: settings.morningReminderMinute)
+        }
         await wcDelegate.sendFullSyncToWatch()
         await BodyMeasurementStore.retryHealthExports(in: container.mainContext)
     }
