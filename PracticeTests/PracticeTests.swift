@@ -229,6 +229,34 @@ struct ProgressionEngineTests {
     }
 }
 
+@Suite("Press Handstand progression")
+struct PressHandstandProgressionTests {
+    @Test("Introduces the weight-transfer drills before the elevated straddle press")
+    func revisedOrder() {
+        let levels = SkillProgressions.pressHandstand.levels
+
+        #expect(levels.map(\.name) == [
+            "Standing Straddle Compression / Foot Lifts",
+            "Feet-Elevated Pike Weight Shift",
+            "Feet-Elevated Pike Toe Float",
+            "Feet-Elevated Straddle Toe Float",
+            "Feet-Elevated Straddle Press Drill",
+            "Wall Straddle Press Negative",
+            "Floor Straddle Press Negative",
+            "Partial Straddle Press",
+            "Straddle Press Handstand"
+        ])
+        #expect(Set(levels.map(\.id)).count == levels.count)
+    }
+
+    @Test("Maps every legacy Press Handstand level to its matching revised stage")
+    func legacyLevelMapping() {
+        #expect(SkillProgressions.legacyPressHandstandLevelMap == [
+            1: 4, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9
+        ])
+    }
+}
+
 @Suite("Completed set metrics")
 struct CompletedSetMetricTests {
     @Test func derivesHeartRateMetrics() {

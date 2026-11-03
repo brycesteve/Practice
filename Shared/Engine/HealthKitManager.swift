@@ -22,16 +22,22 @@ public enum HealthKitError: Error, LocalizedError {
 public final class HealthKitManager: NSObject, Sendable {
     
     public static let shared = HealthKitManager()
-    private let store = HKHealthStore()
+    let store = HKHealthStore()
     
     // Types we want to read & write
     private let writeTypes: Set<HKSampleType> = [
+        HKQuantityType(.bodyMass),
+        HKQuantityType(.bodyFatPercentage),
+        HKQuantityType(.leanBodyMass),
+        HKQuantityType(.waistCircumference),
         HKQuantityType(.activeEnergyBurned),
         HKQuantityType(.heartRate),
         HKObjectType.workoutType(),
     ]
     
     private let readTypes: Set<HKObjectType> = [
+        HKQuantityType(.height),
+        HKQuantityType(.waistCircumference),
         HKQuantityType(.activeEnergyBurned),
         HKQuantityType(.heartRate),
         HKObjectType.workoutType(),
@@ -234,7 +240,7 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     public private(set) var latestHeartRateSample: HeartRateSample?
     
     private var timer: Timer?
-    private var sessionStartDate: Date?
+    private(set) var sessionStartDate: Date?
     private var heartRateSampleTotal: Double = 0
     private var heartRateSampleCount: Int = 0
     
@@ -301,6 +307,17 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         return workout?.uuid
     }
     
+    /// End an unlogged/abandoned session without creating a HealthKit workout.
+    public func discardWorkout() {
+        session?.end()
+        builder?.discardWorkout()
+        stopTimer()
+        isRunning = false
+        isPaused = false
+        session = nil
+        builder = nil
+    }
+
     // MARK: - Timer
     
     private func resetLiveMetrics() {

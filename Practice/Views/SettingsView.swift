@@ -151,6 +151,10 @@ struct SettingsView: View {
                     Label("Notifications", systemImage: "bell.badge")
                 }
                 
+                Section("Body measurements") {
+                    NavigationLink("Body profile & scale") { BodyProfileSettingsView() }
+                }
+
                 // MARK: Weigh-in reminder
                 Section {
                     WeighInReminderRow()
@@ -158,16 +162,7 @@ struct SettingsView: View {
                     Label("Weekly Weigh-In", systemImage: "scalemass")
                 }
                 
-#if DEBUG
-                
-                Button("Promote CloudKit Schema") {
-                    
-                    CloudKitSchemaPromotionEngine
-                        .run(container: modelContext.container)
-                    
-                }
-                
-#endif
+
             }
             .navigationTitle("Settings")
             .task {

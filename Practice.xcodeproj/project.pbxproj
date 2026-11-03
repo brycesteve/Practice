@@ -127,15 +127,21 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Data/AppGroupDefaults.swift,
+				Data/BodyMeasurements.swift,
 				Data/Exercises.swift,
 				Data/SharedModels.swift,
 				Data/SkillProgressions.swift,
 				Data/Skills.swift,
 				Data/WorkoutData.swift,
+				Engine/BodyCompositionCalculator.swift,
+				Engine/BodyMeasurementOutbox.swift,
+				Engine/HealthKitBodyMeasurements.swift,
 				Engine/HealthKitManager.swift,
 				Engine/NotificationManager.swift,
 				Engine/ProgressionEngine.swift,
 				Engine/RecoveryEngine.swift,
+				Engine/ScaleProtocol.swift,
+				Engine/TrainingIntegrity.swift,
 				Engine/WatchConnectivityManager.swift,
 				Errors/ErrorBanner.swift,
 				Errors/ErrorState.swift,
@@ -156,15 +162,21 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Data/AppGroupDefaults.swift,
+				Data/BodyMeasurements.swift,
 				Data/Exercises.swift,
 				Data/SharedModels.swift,
 				Data/SkillProgressions.swift,
 				Data/Skills.swift,
 				Data/WorkoutData.swift,
+				Engine/BodyCompositionCalculator.swift,
+				Engine/BodyMeasurementOutbox.swift,
+				Engine/HealthKitBodyMeasurements.swift,
 				Engine/HealthKitManager.swift,
 				Engine/NotificationManager.swift,
 				Engine/ProgressionEngine.swift,
 				Engine/RecoveryEngine.swift,
+				Engine/ScaleProtocol.swift,
+				Engine/TrainingIntegrity.swift,
 				Engine/WatchConnectivityManager.swift,
 				Logger.swift,
 				SharedAssets.xcassets,
@@ -182,15 +194,21 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Data/AppGroupDefaults.swift,
+				Data/BodyMeasurements.swift,
 				Data/Exercises.swift,
 				Data/SharedModels.swift,
 				Data/SkillProgressions.swift,
 				Data/Skills.swift,
 				Data/WorkoutData.swift,
+				Engine/BodyCompositionCalculator.swift,
+				Engine/BodyMeasurementOutbox.swift,
+				Engine/HealthKitBodyMeasurements.swift,
 				Engine/HealthKitManager.swift,
 				Engine/NotificationManager.swift,
 				Engine/ProgressionEngine.swift,
 				Engine/RecoveryEngine.swift,
+				Engine/ScaleProtocol.swift,
+				Engine/TrainingIntegrity.swift,
 				Engine/WatchConnectivityManager.swift,
 				Logger.swift,
 				SharedAssets.xcassets,
@@ -665,7 +683,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
@@ -690,7 +708,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
@@ -715,7 +733,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.stevebryce.PracticeWatchTests;
@@ -737,7 +755,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.stevebryce.PracticeWatchTests;
@@ -888,14 +906,14 @@
 				CODE_SIGN_ENTITLEMENTS = Practice/Practice.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Practice/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts, height, date of birth, biological sex and waist measurements to personalise training and calculate body-composition estimates.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Save workouts, measured weight and waist, and estimated body fat and lean body mass to Apple Health.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start workouts";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -926,14 +944,14 @@
 				CODE_SIGN_ENTITLEMENTS = Practice/Practice.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Practice/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts, height, date of birth, biological sex and waist measurements to personalise training and calculate body-composition estimates.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Save workouts, measured weight and waist, and estimated body fat and lean body mass to Apple Health.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start workouts";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -964,14 +982,15 @@
 				CODE_SIGN_ENTITLEMENTS = "PracticeWatch Watch App/PracticeWatch Watch App.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PracticeWatch-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Practice;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Listen to your Bluetooth scale to record weight and impedance when you start a body measurement.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts, height, date of birth, biological sex and waist measurements to personalise training and calculate body-composition estimates.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Save workouts, measured weight and waist, and estimated body fat and lean body mass to Apple Health.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start Workouts";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = net.stevebryce.Practice;
@@ -1002,14 +1021,15 @@
 				CODE_SIGN_ENTITLEMENTS = "PracticeWatch Watch App/PracticeWatch Watch App.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "PracticeWatch-Watch-App-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Practice;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts from HealthKit";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Add workouts to HealthKit";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Listen to your Bluetooth scale to record weight and impedance when you start a body measurement.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Read workouts, height, date of birth, biological sex and waist measurements to personalise training and calculate body-composition estimates.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Save workouts, measured weight and waist, and estimated body fat and lean body mass to Apple Health.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Allow Siri to start Workouts";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = net.stevebryce.Practice;
@@ -1039,7 +1059,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWatchWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
@@ -1079,7 +1099,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWatchWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWatchWidgetExtension/Info.plist;
@@ -1119,7 +1139,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;
@@ -1154,7 +1174,7 @@
 				CODE_SIGN_ENTITLEMENTS = PracticeWidgetExtensionExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 12;
 				DEVELOPMENT_TEAM = XHMLRUNE5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = PracticeWidgetExtension/Info.plist;

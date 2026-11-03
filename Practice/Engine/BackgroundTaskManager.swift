@@ -149,7 +149,7 @@ public final class BackgroundTaskManager {
             let descriptor = FetchDescriptor<RecoveryScoreRecord>(
                 predicate: #Predicate { $0.date >= today }
             )
-            let existing = try context.fetch(descriptor).first
+            let existing = try context.fetch(descriptor).first { $0.date <= Date() && $0.isConsistentCache }
             
             let record: RecoveryScoreRecord
             if let e = existing {
@@ -198,7 +198,7 @@ public final class BackgroundTaskManager {
             
             if existingCond == nil {
                 let kbRecords   = (try? context.fetch(FetchDescriptor<KettlebellWeightRecord>())) ?? []
-                let allWorkouts = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
+                let allWorkouts = ((try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []).filter(\.isMeaningfulTraining)
                 let bodyMass    = try? await HealthKitManager.shared.fetchLatestBodyMass()
                 
                 // Consistency: trained + rest days / target in last 28 days

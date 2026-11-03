@@ -7,7 +7,7 @@ import Charts
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var allWorkouts: [WorkoutRecord]
+    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var storedWorkouts: [WorkoutRecord]
     @Query private var progressionRecords: [SkillProgressionRecord]
     @Query private var settingsResults: [AppSettings]
     @Query private var restDays: [RestDayRecord]
@@ -22,6 +22,15 @@ struct DashboardView: View {
     @State private var showEveningPreview = false
     @State private var path = NavigationPath()
     
+    private var allWorkouts: [WorkoutRecord] { storedWorkouts.filter(\.isMeaningfulTraining) }
+    @Query private var skillSessions: [SkillSessionRecord]
+    private var eveningRotationDay: Int {
+        let completion = EveningRotation.latest(workouts: allWorkouts.map { $0.toCompletedWorkout() },
+            entries: skillSessions.map { $0.toSkillSessionEntry() },
+            progressions: progressionRecords.map { $0.toSkillProgression() } + SkillProgressions.defaultSkillProgressions)
+        return EveningRotation.nextIndex(after: completion, fallback: settings.eveningRotationDay)
+    }
+
     private var settings: AppSettings { settingsResults.first ?? AppSettings() }
     
     private var greeting: String {
@@ -115,7 +124,7 @@ struct DashboardView: View {
     @MainActor
     private func loadCachedRecoveryScore() async {
         let today = Calendar.current.startOfDay(for: Date())
-        let todayRecord = recoveryHistory.first { Calendar.current.isDate($0.date, inSameDayAs: today) }
+        let todayRecord = recoveryHistory.first { Calendar.current.isDate($0.date, inSameDayAs: today) && $0.date <= Date() && $0.isConsistentCache }
         let cacheIsFresh = todayRecord.map { Date().timeIntervalSince($0.date) < 2 * 3600 } ?? false
         
         if !cacheIsFresh {
@@ -123,7 +132,7 @@ struct DashboardView: View {
         }
         
         let fetchedRecords = (try? modelContext.fetch(FetchDescriptor<RecoveryScoreRecord>())) ?? []
-        guard let record = (recoveryHistory + fetchedRecords).first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) else {
+        guard let record = (recoveryHistory + fetchedRecords).first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) && $0.date <= Date() && $0.isConsistentCache }) else {
             recoveryScore = nil
             return
         }
@@ -279,7 +288,7 @@ struct DashboardView: View {
     @ViewBuilder
     var upcomingSkillCard: some View {
         let skillNames = Skill.activeSkills.map { $0.rawValue }
-        let tonight    = skillNames[settings.eveningRotationDay % Skill.activeSkills.count]
+        let tonight    = skillNames[eveningRotationDay]
         let prog       = progressionRecords.first { $0.skillName == tonight }
         
         Button { showEveningPreview = true } label: {
@@ -302,7 +311,7 @@ struct DashboardView: View {
         .buttonStyle(.plain)
         .sheet(isPresented: $showEveningPreview) {
             EveningPreviewSheet(
-                rotationDay: settings.eveningRotationDay,
+                rotationDay: eveningRotationDay,
                 progressions: progressionRecords.map { $0.toSkillProgression() }
             )
         }

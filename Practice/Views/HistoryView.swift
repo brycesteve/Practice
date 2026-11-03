@@ -85,6 +85,12 @@ struct WorkoutRowView: View {
                 Text(workout.sessionType.displayName).font(.headline)
                 Text(workout.startDate.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption).foregroundStyle(.secondary)
+                if !workout.isMeaningfulTraining {
+                    Text(workout.toCompletedWorkout().isLegacySchemaSeed
+                        ? "Diagnostic record — not counted as training"
+                        : "No completed activity — not counted as training")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {

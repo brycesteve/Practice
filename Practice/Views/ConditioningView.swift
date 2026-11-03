@@ -20,9 +20,10 @@ struct ConditioningView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \ConditioningScoreRecord.date, order: .reverse) private var history: [ConditioningScoreRecord]
     @Query(sort: \KettlebellWeightRecord.date, order: .reverse) private var kbRecords: [KettlebellWeightRecord]
-    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
+    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var storedWorkouts: [WorkoutRecord]
     @Query private var restDays: [RestDayRecord]
 
+    private var workouts: [WorkoutRecord] { storedWorkouts.filter(\.isMeaningfulTraining) }
     @State private var current: ConditioningResult? = nil
     @State private var isLoading = false
     @State private var bodyMassKg: Double? = nil

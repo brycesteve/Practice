@@ -13,8 +13,17 @@ struct AppGroupDefaults {
     private let defaults = UserDefaults(suiteName: "group.net.stevebryce.practice")
     
     func saveAppContext(_ data: WCSyncPayload) {
-        let data = try? JSONEncoder().encode(data)
-        defaults?.set(data, forKey: "appContext")
+        var data = data
+#if os(watchOS)
+        // Preserve a just-completed offline Watch session until the phone catches up.
+        if let local = loadAppContext().lastEveningCompletion,
+           local.date > (data.lastEveningCompletion?.date ?? .distantPast) {
+            data.lastEveningCompletion = local
+        }
+#endif
+        data.eveningRotationDay = EveningRotation.nextIndex(after: data.lastEveningCompletion, fallback: data.eveningRotationDay)
+        let encoded = try? JSONEncoder().encode(data)
+        defaults?.set(encoded, forKey: "appContext")
         defaults?.synchronize()
     }
     
@@ -24,7 +33,10 @@ struct AppGroupDefaults {
             return WCSyncPayload()
         }
         
-        return decoded
+        var value = decoded
+        if let recovery = value.recoveryData, !RecoveryAggregation.isConsistent(recovery) { value.recoveryData = nil }
+        value.eveningRotationDay = EveningRotation.nextIndex(after: value.lastEveningCompletion, fallback: value.eveningRotationDay)
+        return value
     }
     
     func updateRestDays(_ days: [Date]) {

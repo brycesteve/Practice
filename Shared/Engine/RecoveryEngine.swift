@@ -377,9 +377,7 @@ public actor RecoveryEngine {
             loadC = s; components.append((s, 0.10))
         }
         
-        let totalWeight = components.map(\.weight).reduce(0, +)
-        let weighted    = totalWeight == 0 ? 50.0 :
-        components.map { $0.score * ($0.weight / totalWeight) }.reduce(0, +)
+        let weighted = RecoveryAggregation.score([hrvC, rhrC, sleepDurC, sleepQC, respC, loadC])
         
         let quality: RecoveryScore.DataQuality
         switch components.count {

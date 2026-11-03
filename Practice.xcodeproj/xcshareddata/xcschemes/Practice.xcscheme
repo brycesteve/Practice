@@ -27,8 +27,24 @@
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
-      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldUseLaunchSchemeArgsEnv = "NO"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "AA1336BD30432DDF00897A86"
+               BuildableName = "PracticeTests.xctest"
+               BlueprintName = "PracticeTests"
+               ReferencedContainer = "container:Practice.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+      <EnvironmentVariables>
+         <EnvironmentVariable key="PracticeIsolatedTests" value="1" isEnabled="YES"/>
+      </EnvironmentVariables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

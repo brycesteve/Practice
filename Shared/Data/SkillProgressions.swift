@@ -5,6 +5,8 @@
 //  Created by Steve Bryce on 05/05/2026.
 //
 
+import Foundation
+
 public enum SkillProgressions {
     public static var defaultSkillProgressions: [SkillProgression] {
         [
@@ -17,78 +19,121 @@ public enum SkillProgressions {
         ]
     }
     
+    /// Maps the six-level Press Handstand path shipped before the weight-transfer revision.
+    /// Stored sessions use this numeric level, so the mapping is deliberately permanent.
+    static let legacyPressHandstandLevelMap = [1: 4, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9]
+
+    static let legacyPressHandstandExerciseNames = [
+        "Feet-Elevated Straddle Press Drill",
+        "Feet-Elevated Straddle Press"
+    ]
+
+    static func isLegacyPressHandstand(_ levels: [SkillLevel]) -> Bool {
+        levels.count == 6
+            && levels.contains { $0.level == 1 && $0.name == "Feet-Elevated Straddle Press Drill" }
+            && levels.contains { $0.level == 6 && $0.name == "Straddle Press Handstand" }
+    }
+
     static var pressHandstand: SkillProgression {
         SkillProgression(
             skillName: "Press Handstand",
             levels: [
-                SkillLevel(
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E01",
                     level: 1,
-                    name: "Feet-Elevated Straddle Press Drill",
-                    details: "Feet on a sofa or chair; lean forward and lift the hips to unload the feet.",
-                    targetReps: 5,
-                    advanceCriteria: AdvanceCriteria(
-                        consecutiveSessions: 3,
-                        maxAverageDifficulty: 2.5,
-                        minReps: 5
-                    )
+                    name: "Standing Straddle Compression / Foot Lifts",
+                    details: "Use a comfortable standing straddle with hands on the floor or blocks. Keep each leg straight and alternately make one foot light, then lift it a little; the win is feeling the hip flexors lift the leg without needing a deep straddle. Count one controlled lift on each side as one rep.",
+                    targetReps: 5
                 ),
-                SkillLevel(
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E02",
                     level: 2,
-                    name: "Feet-Elevated Straddle Press",
-                    details: "Feet on a sofa or chair; lift both feet clear with straight arms.",
-                    targetReps: 3,
-                    advanceCriteria: AdvanceCriteria(
-                        consecutiveSessions: 3,
-                        maxAverageDifficulty: 2.5,
-                        minReps: 3
-                    )
+                    name: "Feet-Elevated Pike Weight Shift",
+                    details: "With feet together on a box or bench, hips high, and straight arms, push tall through the shoulders and slowly rock the shoulders over and slightly past the wrists. Keep the feet supported: success is being able to feel them become progressively lighter and return under control.",
+                    targetReps: 5
                 ),
-                SkillLevel(
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E03",
                     level: 3,
-                    name: "Wall Straddle Press Negative",
-                    details: "From chest-to-wall handstand, lower slowly through a wide straddle.",
-                    targetReps: 3,
-                    advanceCriteria: AdvanceCriteria(
-                        consecutiveSessions: 4,
-                        maxAverageDifficulty: 3.0,
-                        minReps: 3
-                    )
+                    name: "Feet-Elevated Pike Toe Float",
+                    details: "Use the same elevated pike. Shift until the feet are light enough to let the toes float briefly, then return with control. A momentary float counts; build toward repeatable, longer floats while keeping the elbows straight and shoulders pushing tall.",
+                    targetReps: 3
                 ),
-                SkillLevel(
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E04",
                     level: 4,
-                    name: "Floor Straddle Press Negative",
-                    details: "Lower from a freestanding handstand to the floor with maximum control.",
-                    targetReps: 3,
-                    advanceCriteria: AdvanceCriteria(
-                        consecutiveSessions: 5,
-                        maxAverageDifficulty: 3.0,
-                        minReps: 3
-                    )
+                    name: "Feet-Elevated Straddle Toe Float",
+                    details: "From the elevated position, shift weight over the hands first, then let the legs open to a straddle as the support unloads. Aim for brief, controlled floats rather than a full press; success is finding the same light-feet position without losing shoulder pressure.",
+                    targetReps: 3
                 ),
-                SkillLevel(
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E05",
                     level: 5,
-                    name: "Partial Straddle Press",
-                    details: "Press from the floor until both feet clearly leave it; keep arms straight.",
-                    targetReps: 3,
-                    advanceCriteria: AdvanceCriteria(
-                        consecutiveSessions: 6,
-                        maxAverageDifficulty: 3.5,
-                        minReps: 3
-                    )
+                    name: "Feet-Elevated Straddle Press Drill",
+                    details: "With feet elevated, use the weight shift and toe float to press the straddled legs clear of the support with straight arms. The goal is a controlled, repeatable float and return—not forcing height before the centre of mass is over the hands.",
+                    targetReps: 3
                 ),
-                SkillLevel(
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E06",
                     level: 6,
-                    name: "Straddle Press Handstand",
-                    details: "Complete one clean press from the floor with straight arms and control.",
-                    targetReps: 1,
-                    advanceCriteria: AdvanceCriteria(
-                        consecutiveSessions: 6,
-                        maxAverageDifficulty: 3.5,
-                        minReps: 1
-                    )
+                    name: "Wall Straddle Press Negative",
+                    details: "From a chest-to-wall handstand, lower slowly through a wide straddle. Keep pressing tall and control the hips as they travel back over the hands; success is a quiet, even descent rather than dropping into the floor.",
+                    targetReps: 3,
+                    consecutiveSessions: 4,
+                    maxAverageDifficulty: 3.0
                 ),
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E07",
+                    level: 7,
+                    name: "Floor Straddle Press Negative",
+                    details: "Lower from a freestanding handstand toward the floor with maximum control. Keep straight arms and use the straddle to keep the hips travelling over the hands; success is reaching the floor without a sudden loss of balance.",
+                    targetReps: 3,
+                    consecutiveSessions: 5,
+                    maxAverageDifficulty: 3.0
+                ),
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E08",
+                    level: 8,
+                    name: "Partial Straddle Press",
+                    details: "From the floor, press until both feet clearly leave it while keeping the arms straight and shoulders active. Success is a controlled take-off with the hips moving over the hands, even before reaching handstand.",
+                    targetReps: 3,
+                    consecutiveSessions: 6,
+                    maxAverageDifficulty: 3.5
+                ),
+                pressHandstandLevel(
+                    id: "EF8B1264-584B-4A3E-A648-D43DB9278E09",
+                    level: 9,
+                    name: "Straddle Press Handstand",
+                    details: "Complete a clean press from the floor to handstand with straight arms and control. The finish should feel like the same deliberate weight transfer continued upward, not a jump or kick.",
+                    targetReps: 1,
+                    consecutiveSessions: 6,
+                    maxAverageDifficulty: 3.5
+                )
             ],
             currentLevel: 1
+        )
+    }
+
+    private static func pressHandstandLevel(
+        id: String,
+        level: Int,
+        name: String,
+        details: String,
+        targetReps: Int,
+        consecutiveSessions: Int = 3,
+        maxAverageDifficulty: Double = 2.5
+    ) -> SkillLevel {
+        SkillLevel(
+            id: UUID(uuidString: id) ?? UUID(),
+            level: level,
+            name: name,
+            details: details,
+            targetReps: targetReps,
+            advanceCriteria: AdvanceCriteria(
+                consecutiveSessions: consecutiveSessions,
+                maxAverageDifficulty: maxAverageDifficulty,
+                minReps: targetReps
+            )
         )
     }
     

@@ -15,6 +15,8 @@ import WidgetKit
 
 public enum WCMessageKey {
     // Watch → Phone
+    public static let bodyMeasurement = "bodyMeasurement"
+    public static let bodyAcknowledgement = "bodyAcknowledgement"
     public static let completedWorkout  = "completedWorkout"   // Data (JSON-encoded CompletedWorkout)
     public static let skillEntry        = "skillEntry"          // Data
     public static let kettlebellEntry   = "kettlebellEntry"     // Data
@@ -32,6 +34,7 @@ public enum WCMessageKey {
 /// Everything the watch needs to know about the current training state
 public struct WCSyncPayload: Codable, Sendable {
     public var skillProgressions: [SkillProgression]
+    var lastEveningCompletion: EveningCompletion? = nil
     public var eveningRotationDay: Int
     public var targetSwingWeightKg: Double
     public var targetTGUWeightKg: Double
@@ -45,6 +48,7 @@ public struct WCSyncPayload: Codable, Sendable {
     public var lastTGUWeightKg: Double
     public var recoveryData: RecoveryDataDTO?
     public var restDays: [Date]
+    public var bodyConfiguration: BodyConfiguration?
     
     
     
@@ -62,7 +66,8 @@ public struct WCSyncPayload: Codable, Sendable {
         lastSwingWeightKg: Double = 24,
         lastTGUWeightKg: Double = 24,
         recoveryData: RecoveryDataDTO? = nil,
-        restDays: [Date] = []
+        restDays: [Date] = [],
+        bodyConfiguration: BodyConfiguration? = nil
     ) {
         self.skillProgressions = skillProgressions
         self.eveningRotationDay = eveningRotationDay
@@ -78,11 +83,13 @@ public struct WCSyncPayload: Codable, Sendable {
         self.lastTGUWeightKg = lastTGUWeightKg
         self.recoveryData = recoveryData
         self.restDays = restDays
+        self.bodyConfiguration = bodyConfiguration
     }
     
     enum CodingKeys: String, CodingKey {
         case skillProgressions
         case eveningRotationDay
+        case lastEveningCompletion
         case targetSwingWeightKg
         case targetTGUWeightKg
         case currentSwingWeightKg
@@ -95,12 +102,14 @@ public struct WCSyncPayload: Codable, Sendable {
         case lastTGUWeightKg
         case recoveryData
         case restDays
+        case bodyConfiguration
     }
     
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         skillProgressions = try container.decodeIfPresent([SkillProgression].self, forKey: .skillProgressions) ?? []
         eveningRotationDay = try container.decodeIfPresent(Int.self, forKey: .eveningRotationDay) ?? 0
+        lastEveningCompletion = try container.decodeIfPresent(EveningCompletion.self, forKey: .lastEveningCompletion)
         targetSwingWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetSwingWeightKg) ?? 24
         targetTGUWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetTGUWeightKg) ?? 24
         lastSwingWeightKg = try container.decodeIfPresent(Double.self, forKey: .lastSwingWeightKg) ?? 24
@@ -113,6 +122,7 @@ public struct WCSyncPayload: Codable, Sendable {
         tguProgressionSetCount = try container.decodeIfPresent(Int.self, forKey: .tguProgressionSetCount) ?? 0
         recoveryData = try container.decodeIfPresent(RecoveryDataDTO.self, forKey: .recoveryData)
         restDays = try container.decodeIfPresent([Date].self, forKey: .restDays) ?? []
+        bodyConfiguration = try container.decodeIfPresent(BodyConfiguration.self, forKey: .bodyConfiguration)
     }
     
     public mutating func updateRestDays(_ days: [Date]) {
@@ -131,6 +141,7 @@ public struct WCSyncPayload: Codable, Sendable {
 // MARK: - Delegate protocol (implemented separately on iOS and watchOS)
 
 public protocol WatchConnectivityDelegate: AnyObject, Sendable {
+    func didReceiveBodyMeasurement(_ measurement: RawBodyMeasurement) async -> Bool
     /// Phone received a completed workout from the watch
     func didReceiveCompletedWorkout(_ workout: CompletedWorkout) async
     /// Phone received a skill session entry from the watch
@@ -140,6 +151,10 @@ public protocol WatchConnectivityDelegate: AnyObject, Sendable {
     /// Watch received a full sync payload from the phone
     func didReceiveSyncPayload(_ payload: WCSyncPayload) async
     
+}
+
+public extension WatchConnectivityDelegate {
+    func didReceiveBodyMeasurement(_ measurement: RawBodyMeasurement) async -> Bool { false }
 }
 
 // MARK: - Manager
@@ -166,10 +181,26 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
     }
     
     
+    @MainActor
+    func flushBodyMeasurements() {
+#if os(watchOS)
+        guard let session, session.activationState == .activated else { return }
+        for measurement in BodyMeasurementOutbox.shared.pending {
+            guard let data = try? JSONEncoder().encode(measurement) else { continue }
+            let alreadyQueued = session.outstandingUserInfoTransfers.contains {
+                guard let bytes = $0.userInfo[WCMessageKey.bodyMeasurement] as? Data,
+                      let queued = try? JSONDecoder().decode(RawBodyMeasurement.self, from: bytes) else { return false }
+                return queued.id == measurement.id
+            }
+            if !alreadyQueued { session.transferUserInfo([WCMessageKey.bodyMeasurement: data]) }
+        }
+#endif
+    }
+
     // MARK: - Watch → Phone: send completed workout
     
     public func sendWorkout(_ workout: CompletedWorkout) {
-        guard let data = try? JSONEncoder().encode(workout) else { return }
+        guard workout.isMeaningfulTraining, let data = try? JSONEncoder().encode(workout) else { return }
         send(message: [WCMessageKey.completedWorkout: data])
     }
     
@@ -257,6 +288,19 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
     
     private func handle(message: [String: Any]) {
         Task {
+            if let data = message[WCMessageKey.bodyMeasurement] as? Data,
+               let measurement = try? JSONDecoder().decode(RawBodyMeasurement.self, from: data),
+               await delegate?.didReceiveBodyMeasurement(measurement) == true {
+                send(message: [WCMessageKey.bodyAcknowledgement: measurement.id.uuidString])
+            }
+#if os(watchOS)
+            if let text = message[WCMessageKey.bodyAcknowledgement] as? String, let id = UUID(uuidString: text) {
+                await MainActor.run {
+                    do { try BodyMeasurementOutbox.shared.acknowledge(id) }
+                    catch { print("Body acknowledgement could not be saved: \(error)") }
+                }
+            }
+#endif
             if let data = message[WCMessageKey.completedWorkout] as? Data,
                let workout = try? JSONDecoder().decode(CompletedWorkout.self, from: data) {
                 await delegate?.didReceiveCompletedWorkout(workout)
@@ -291,6 +335,7 @@ public final class WatchConnectivityManager: NSObject, @unchecked Sendable {
                 
                 await MainActor.run {
                     self.lastSyncDate = Date()
+                    self.flushBodyMeasurements()
                     
                     NotificationCenter.default.post(
                         name: .syncPayloadReceived,
@@ -346,12 +391,14 @@ extension WatchConnectivityManager: WCSessionDelegate {
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         Task { @MainActor in
             self.isReachable = session.isReachable
+            self.flushBodyMeasurements()
         }
     }
     
     public func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             self.isReachable = session.isReachable
+            self.flushBodyMeasurements()
         }
     }
     

@@ -15,7 +15,7 @@ struct SessionPickerView: View {
     
     private var rotationLabel: String {
         let names = Skill.activeSkills.map { $0.rawValue }
-        return "Evening: \(names[settings.eveningRotationDay % Skill.activeSkills.count])"
+        return "Evening: \(names[EveningRotation.normalized(settings.eveningRotationDay)])"
     }
     
     var body: some View {
@@ -39,6 +39,20 @@ struct SessionPickerView: View {
                         .opacity(sessionManager.isRunning ? 0.45 : 1)
                     }
                     
+                    NavigationLink(destination: ScaleMeasurementView()) {
+                        HStack {
+                            Image(systemName: "scalemass")
+                            Text("Body Measurement")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(SecondaryTileStyle(isActive: false))
+                    .disabled(sessionManager.isRunning)
+
                     // MARK: - Secondary Actions
                     VStack(spacing: 10) {
                         
@@ -82,7 +96,11 @@ struct SessionPickerView: View {
             }
             .navigationTitle("Practice")
             .navigationDestination(for: SessionType.self) { type in
-                WorkoutGuideView(plan: plan(for: type))
+                if type == .evening {
+                    EveningSessionSelectionView(settings: settings)
+                } else {
+                    WorkoutGuideView(plan: plan(for: type))
+                }
             }
             .onAppear {
                 settings = AppGroupDefaults.shared.loadAppContext()
@@ -242,4 +260,31 @@ struct SessionPickerView: View {
 #Preview {
     SessionPickerView()
         .environment(ErrorState())
+}
+
+/// Selection changes only this plan. Automatic rotation changes only after logged skill completion.
+private struct EveningSessionSelectionView: View {
+    let settings: WCSyncPayload
+    @State private var selectedSkill = ""
+
+    private var automatic: Skill { Skill.activeSkills[EveningRotation.normalized(settings.eveningRotationDay)] }
+    private var chosen: Skill { Skill(rawValue: selectedSkill) ?? automatic }
+
+    var body: some View {
+        List {
+            Picker("Tonight's skill", selection: $selectedSkill) {
+                Text("Automatic: \(automatic.rawValue)").tag("")
+                ForEach(Skill.activeSkills, id: \.rawValue) { skill in
+                    Text(skill.rawValue).tag(skill.rawValue)
+                }
+            }
+            NavigationLink("Prepare \(chosen.rawValue)") {
+                WorkoutGuideView(plan: SessionPlan(sessionType: .evening,
+                    steps: chosen.routine(from: settings.skillProgressions), estimatedDurationMinutes: 30))
+            }
+            Text("Your next automatic suggestion follows the skill you actually complete.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .navigationTitle("Evening skill")
+    }
 }

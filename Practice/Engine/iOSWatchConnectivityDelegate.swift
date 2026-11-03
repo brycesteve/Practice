@@ -50,36 +50,38 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
         }
     }
     
+    public func didReceiveBodyMeasurement(_ measurement: RawBodyMeasurement) async -> Bool {
+        do {
+            // Save observations first, before HealthKit queries or writes.
+            let id = try BodyMeasurementStore.insert(measurement, into: modelContainer)
+            Task { @MainActor in
+                let context = modelContainer.mainContext
+                guard let record = try? context.fetch(FetchDescriptor<BodyMeasurementRecord>(
+                    predicate: #Predicate { $0.id == id })).first else { return }
+                try? await BodyMeasurementStore.fillMissingProfile(record, in: context)
+                await BodyMeasurementStore.export(record, in: context)
+            }
+            return true
+        } catch {
+            print("Body measurement save failed; Watch retains its copy: \(error)")
+            return false
+        }
+    }
+
     // MARK: - WatchConnectivityDelegate
     
     /// Watch finished a workout — persist the full WorkoutRecord tree.
     public func didReceiveCompletedWorkout(_ workout: CompletedWorkout) async {
-        let context = modelContainer.mainContext
-        
-        // Avoid duplicates
-        let id = workout.id
-        guard (try? context.fetch(
-            FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.id == id })
-        ))?.isEmpty != false else { return }
-        
-        // WorkoutRecord.init builds the full ExerciseRecord/SetRecord tree
-        let record = WorkoutRecord(from: workout)
-        context.insert(record)
-        
-        // Explicitly insert children so this context tracks them
-        for exRecord in record.exercises ?? [] {
-            context.insert(exRecord)
-            for setRecord in exRecord.sets ?? [] {
-                context.insert(setRecord)
+        do {
+            if try TrainingHistoryIntegrity.insertWorkout(workout, into: modelContainer) {
+                await sendFullSyncToWatch()
             }
-        }
-        
-        do { try context.save() }
-        catch { print("didReceiveCompletedWorkout save error: \(error)") }
+        } catch { print("didReceiveCompletedWorkout save error: \(error)") }
     }
     
     /// Watch finished a skill progression set — persist entry and re-evaluate.
     public func didReceiveSkillEntry(_ entry: SkillSessionEntry) async {
+        guard entry.sets.contains(where: \.hasCompletedActivity) else { return }
         let context = modelContainer.mainContext
         
         // Avoid duplicates
@@ -226,22 +228,9 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
     }
     
     private func handleRotationDay(_ day: Int) async {
-        let context = modelContainer.mainContext
-        do {
-            var settings: AppSettings?
-            settings = try? context.fetch(FetchDescriptor<AppSettings>()).first
-            if settings == nil {
-                settings = AppSettings()
-                context.insert(settings!)
-            }
-            settings?.eveningRotationDay = day
-            try context.save()
-            
-            AppGroupDefaults.shared.updateRotationDay(day)
-        }
-        catch {
-            print("Error handling rotation day: \(error)")
-        }
+        // Legacy unversioned counters can arrive before/after their workout and are not evidence.
+        // Recompute from persisted completions instead of allowing a stale message to reset rotation.
+        await sendFullSyncToWatch()
     }
     
     
@@ -272,6 +261,7 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
         let recoveryRecords = (try? context.fetch(FetchDescriptor<RecoveryScoreRecord>())) ?? []
         
         let progressions = progressionRecords.map { $0.toSkillProgression() }
+        let lastEvening = TrainingHistoryIntegrity.latestEvening(in: context)
         let latestSwing = kbRecords
             .filter { $0.exerciseType == .swing }
             .max(by: { $0.date < $1.date })?
@@ -285,13 +275,13 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
             : restDayRecords.map { $0.date }
         let today = Calendar.current.startOfDay(for: Date())
         let recoveryData = recoveryRecords
-            .filter { $0.date >= today }
+            .filter { $0.date >= today && $0.date <= Date() && $0.isConsistentCache }
             .max(by: { $0.date < $1.date })?
             .toDTO() ?? cached.recoveryData
         
-        return WCSyncPayload(
+        var payload = WCSyncPayload(
             skillProgressions: progressions,
-            eveningRotationDay: settings?.eveningRotationDay ?? cached.eveningRotationDay,
+            eveningRotationDay: EveningRotation.nextIndex(after: lastEvening, fallback: settings?.eveningRotationDay ?? cached.eveningRotationDay),
             targetSwingWeightKg: settings?.targetSwingWeightKg ?? cached.targetSwingWeightKg,
             targetTGUWeightKg: settings?.targetTGUWeightKg ?? cached.targetTGUWeightKg,
             currentSwingWeightKg: settings?.currentSwingWeightKg ?? cached.currentSwingWeightKg,
@@ -303,7 +293,10 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
             lastSwingWeightKg: latestSwing ?? cached.lastSwingWeightKg,
             lastTGUWeightKg: latestTGU ?? cached.lastTGUWeightKg,
             recoveryData: recoveryData,
-            restDays: restDays
+            restDays: restDays,
+            bodyConfiguration: (try? BodyMeasurementStore.configuration(in: context)) ?? cached.bodyConfiguration
         )
+        payload.lastEveningCompletion = lastEvening
+        return payload
     }
 }

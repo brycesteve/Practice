@@ -82,7 +82,7 @@ public enum WorkoutData {
         rotationDay: Int,
         progressions: [SkillProgression]
     ) -> [WorkoutStep] {
-        let skillIndex = rotationDay % Skill.activeSkills.count
+        let skillIndex = EveningRotation.normalized(rotationDay)
         let skill = Skill.activeSkills[skillIndex]
         return skill.routine(from: progressions)
     }

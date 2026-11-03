@@ -184,6 +184,7 @@ final class WatchActiveWorkoutStore {
 // MARK: - Main View
 
 struct WorkoutGuideView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(ErrorState.self) var errorState
     
     let initialPlan: SessionPlan
@@ -201,6 +202,7 @@ struct WorkoutGuideView: View {
     @State private var showSummary    = false
     @State private var summaryExercises: [CompletedExercise] = []
     @State private var isStarting     = false
+    @State private var isFinishing = false
     @State private var scrollProxy: ScrollViewProxy? = nil
     @State private var restSecondsRemaining = 0
     @State private var restTimer: Timer? = nil
@@ -337,7 +339,7 @@ struct WorkoutGuideView: View {
             Button("End & Save", role: .destructive) { finishWorkout() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Progress so far will be saved.")
+            Text("Logged activity will be saved. A session with no completed activity will be discarded.")
         }
         .navigationBarBackButtonHidden(workoutStarted)
         .toolbar {
@@ -1052,50 +1054,46 @@ struct WorkoutGuideView: View {
     }
     
     private func finishWorkout() {
-        guard workoutStarted else {
+        guard !isFinishing else { return }
+        guard workoutStarted else { return }
+        isFinishing = true
+        finalizeHeartRateMetrics()
+        let exercises = plan.steps.compactMap { completedExercises[$0.id] }
+        guard exercises.contains(where: { $0.sets.contains(where: \.hasCompletedActivity) }) else {
+            sessionManager.discardWorkout()
             activeWorkout.markFinished()
+            isFinishing = false
+            dismiss()
             return
         }
-        
+        let startedAt = sessionManager.sessionStartDate ?? Date().addingTimeInterval(-Double(sessionManager.elapsedSeconds))
         Task {
+            defer { isFinishing = false }
             var hkUUID: UUID?
-            if workoutStarted {
-                do { hkUUID = try await sessionManager.endWorkout() }
-                catch { errorState.post("Error saving HealthKit workout: \(error.localizedDescription)") }
-            }
-            
+            do { hkUUID = try await sessionManager.endWorkout() }
+            catch { errorState.post("Error saving HealthKit workout: \(error.localizedDescription)") }
             TrainingHaptic.workoutEnd()
-            
-            finalizeHeartRateMetrics()
-            let exercises = plan.steps.compactMap { completedExercises[$0.id] }
             summaryExercises = exercises
             let workout = CompletedWorkout(
-                sessionType: plan.sessionType,
-                startDate: Date().addingTimeInterval(-Double(sessionManager.elapsedSeconds)),
-                endDate: Date(),
-                exercises: exercises,
+                sessionType: plan.sessionType, startDate: startedAt, endDate: Date(), exercises: exercises,
                 activeCalories: sessionManager.activeCalories > 0 ? sessionManager.activeCalories : nil,
                 averageHeartRate: sessionManager.averageHeartRate > 0 ? sessionManager.averageHeartRate : nil,
                 peakHeartRate: sessionManager.peakHeartRate > 0 ? sessionManager.peakHeartRate : nil,
-                hkWorkoutUUID: hkUUID
-            )
-            
-            if plan.sessionType == .evening {
-                settings.eveningRotationDay = (
-                    settings.eveningRotationDay + 1
-                ) % Skill.activeSkills.count
-                WatchConnectivityManager.shared
-                    .sendRotationDay(settings.eveningRotationDay)
+                hkWorkoutUUID: hkUUID)
+            if let completion = EveningRotation.completion(for: workout,
+                progressions: settings.skillProgressions + SkillProgressions.defaultSkillProgressions) {
+                var cached = AppGroupDefaults.shared.loadAppContext()
+                cached.lastEveningCompletion = completion
+                cached.eveningRotationDay = EveningRotation.nextIndex(after: completion, fallback: cached.eveningRotationDay)
+                AppGroupDefaults.shared.saveAppContext(cached)
             }
-            
             saveSkillEntries()
-           
             WatchConnectivityManager.shared.sendWorkout(workout)
             activeWorkout.markFinished()
             showSummary = true
         }
     }
-    
+
     private func finalizeHeartRateMetrics() {
         for step in plan.steps {
             guard var exercise = completedExercises[step.id] else { continue }
@@ -1122,7 +1120,7 @@ struct WorkoutGuideView: View {
     
     private func saveSkillEntries() {
         for step in plan.steps where step.exercise.category == .skillProgression {
-            guard let ex = completedExercises[step.id], !ex.sets.isEmpty else { continue }
+            guard let ex = completedExercises[step.id], ex.sets.contains(where: \.hasCompletedActivity) else { continue }
             guard let progRecord = settings.skillProgressions.first(where: {
                 $0.currentSkillLevel?.name == step.exercise.name
             }) else { continue }

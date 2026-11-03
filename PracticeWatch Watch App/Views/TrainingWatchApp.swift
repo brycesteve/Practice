@@ -10,24 +10,27 @@ struct TrainingWatchApp: App {
     private let errorState = ErrorState()
     
     init() {
-        WatchConnectivityManager.shared.activate()
+        if !PracticeExecution.isTesting { WatchConnectivityManager.shared.activate() }
     }
     
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
-                SessionPickerView()
-                    .navigationDestination(isPresented: $showRecovery) {
-                        WatchRecoveryView()
-                    }
-            }
-            .errorBanner()
-            .onOpenURL { url in
-                print(url)
-                if url.host == "recovery" { showRecovery = true }
-            }
-            .task {
-                try? await HealthKitManager.shared.requestAuthorization()
+            if PracticeExecution.isTesting {
+                Color.clear
+            } else {
+                NavigationStack {
+                    SessionPickerView()
+                        .navigationDestination(isPresented: $showRecovery) {
+                            WatchRecoveryView()
+                        }
+                }
+                .errorBanner()
+                .onOpenURL { url in
+                    if url.host == "recovery" { showRecovery = true }
+                }
+                .task {
+                    try? await HealthKitManager.shared.requestAuthorization()
+                }
             }
         }
         .environment(errorState)

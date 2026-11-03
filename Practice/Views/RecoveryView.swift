@@ -8,8 +8,9 @@ import Charts
 
 struct RecoveryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \RecoveryScoreRecord.date, order: .reverse) private var cachedScores: [RecoveryScoreRecord]
+    @Query(sort: \RecoveryScoreRecord.date, order: .reverse) private var storedScores: [RecoveryScoreRecord]
     
+    private var cachedScores: [RecoveryScoreRecord] { storedScores.filter { $0.date <= Date() && $0.isConsistentCache } }
     @State private var score: RecoveryScore? = nil
     @State private var isLoading = true
     @State private var scoreHistory: [RecoveryScoreRecord] = []
@@ -325,7 +326,8 @@ struct RecoveryView: View {
         }
         
         // Build the display score from cached record to avoid a second HealthKit query
-        if let record = cachedScores.first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
+        if let record = ((try? modelContext.fetch(FetchDescriptor<RecoveryScoreRecord>())) ?? [])
+            .first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) && $0.date <= Date() && $0.isConsistentCache }) {
             score = RecoveryScore(
                 overall: record.overallScore,
                 hrvContribution: record.hrvScore,
