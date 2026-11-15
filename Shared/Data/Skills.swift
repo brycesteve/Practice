@@ -3,8 +3,6 @@
 import Foundation
 import SwiftUI
 
-
-
 public enum Skill: String, RawRepresentable, CaseIterable {
     case planche = "Planche"
     case handstand = "Handstand"
@@ -45,9 +43,15 @@ public enum Skill: String, RawRepresentable, CaseIterable {
         case .pressHandstand: return .green
         }
     }
-    
-    
-    func routine(from progressions: [SkillProgression]) -> [WorkoutStep] {
+
+    func routine(from progressions: [SkillProgression], on date: Date = .now,
+                 calendar: Calendar = .current) -> [WorkoutStep] {
+        let stretches = calendar.component(.weekday, from: date) == 5 ? [] : Self.commonStretches()
+        return practiceSteps(from: progressions) + stretches + WorkoutData.barHangSteps
+    }
+
+    /// Skill identity checks must not assemble the full stretch routine for every record.
+    func practiceSteps(from progressions: [SkillProgression]) -> [WorkoutStep] {
         let currentLevel = progressions.first {
             $0.skillName == self.rawValue
         }?.currentSkillLevel
@@ -61,45 +65,13 @@ public enum Skill: String, RawRepresentable, CaseIterable {
         case .pressHandstand: return pressHandstandRoutine(currentLevel: currentLevel)
         }}()
         
-        return routine + Self.commonStretches()
+        return routine
     }
-    
+
     static func commonStretches() -> [WorkoutStep] {
-        [
-            WorkoutStep(
-                exercise: Exercises.ninetyNinety,
-                sets: 4,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercises.qlStraddle,
-                sets: 4,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercises.hamstringStretch,
-                sets: 4,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercises.hipFlexorStretch,
-                sets: 4,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercises.barHang,
-                sets: 2,
-                durationSeconds: 60,
-                restSeconds: 60
-            )
-            
-        ]
+        WorkoutData.eveningStretchSteps
     }
-    
+
     private func plancheRoutine(currentLevel: SkillLevel?) -> [WorkoutStep] {
         
         let warmupGroup = UUID()
@@ -135,53 +107,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 notes: "Log actual hold time and rate effort."
             ),
             
-        ] + plancheStretches()
-    }
-    
-    private func plancheStretches() -> [WorkoutStep] {
-        [
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Chest & Shoulder Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 45,
-                    notes: "Each side"
-                ),
-                sets: 2,
-                durationSeconds: 45,
-                restSeconds: 15
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Wrist Flexor Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Fingers pointing back"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 15
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Prone Thoracic Extension",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Lay prone, prop on elbows"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 15
-            ),
         ]
     }
-    
+
     private func handstandRoutine(currentLevel: SkillLevel?)
     -> [WorkoutStep]
     {
@@ -239,53 +167,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                     ? "Log your best clean hold and difficulty."
                     : "Log controlled steps and difficulty."
             )
-        ] + handstandStretches()
-    }
-    
-    private func handstandStretches() -> [WorkoutStep] {
-        [
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Overhead Shoulder Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 45,
-                    notes: "Each arm"
-                ),
-                sets: 2,
-                durationSeconds: 45,
-                restSeconds: 15
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Bridge Hold",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 3,
-                    defaultDuration: 30,
-                    notes: "Full thoracic extension"
-                ),
-                sets: 3,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Pancake Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 3,
-                    defaultDuration: 45,
-                    notes: "Straddle forward fold"
-                ),
-                sets: 3,
-                durationSeconds: 45,
-                restSeconds: 15
-            ),
         ]
     }
-    
+
     private func ringsRoutine(currentLevel: SkillLevel?)
     -> [WorkoutStep]
     {
@@ -343,41 +227,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                     : "Log actual reps and difficulty."
             ),
             
-        ] + ringStretches()
-    }
-    
-    private func ringStretches() -> [WorkoutStep] {
-        [
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Doorframe Pec Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 45,
-                    notes: "Full thoracic mobility"
-                ),
-                sets: 2,
-                durationSeconds: 45,
-                restSeconds: 15
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "German Hang",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Full shoulder retraction"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 60
-            ),
         ]
     }
 
-    
     private func frontLeverRoutine(currentLevel: SkillLevel?)
     -> [WorkoutStep]
     {
@@ -435,15 +287,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 notes: "Log actual hold time and difficulty."
             ),
             
-        ] + frontLeverStretches()
-    }
-    
-    private func frontLeverStretches() -> [WorkoutStep] {
-        [
-            
         ]
     }
-    
+
     private func compressionRoutine(currentLevel: SkillLevel?)
     -> [WorkoutStep]
     {
@@ -495,40 +341,9 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 notes: "Log actual hold time and difficulty."
             ),
             
-        ] + compressionStretches()
-    }
-    
-    private func compressionStretches() -> [WorkoutStep] {
-        [
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Pancake Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Straddle forward fold"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Calf Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 4,
-                    defaultDuration: 30,
-                    notes: "Toe on step and stretch down. Alternate sides"
-                ),
-                sets: 4,
-                durationSeconds: 30,
-                restSeconds: 15
-            ),
         ]
     }
-    
+
     private func pressHandstandRoutine(currentLevel: SkillLevel?)
     -> [WorkoutStep]
     {
@@ -586,52 +401,7 @@ public enum Skill: String, RawRepresentable, CaseIterable {
                 notes: "Log actual reps and difficulty."
             ),
             
-        ] + pressHandstandStretches()
-    }
-    
-    private func pressHandstandStretches() -> [WorkoutStep] {
-        [
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Pancake Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Straddle forward fold"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Chest & Shoulder Stretch",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 45,
-                    notes: "Each side"
-                ),
-                sets: 2,
-                durationSeconds: 45,
-                restSeconds: 15
-            ),
-            WorkoutStep(
-                exercise: Exercise(
-                    name: "Bridge Hold",
-                    category: .stretch,
-                    setType: .timed,
-                    defaultSets: 2,
-                    defaultDuration: 30,
-                    notes: "Full thoracic extension"
-                ),
-                sets: 2,
-                durationSeconds: 30,
-                restSeconds: 30
-            ),
         ]
     }
-
 
 }

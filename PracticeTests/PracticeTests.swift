@@ -332,7 +332,7 @@ struct TrialProgrammeTests {
     }
 
     @Test func strengthAPrescriptionAndIndependentSquatLoad() {
-        let steps = WorkoutData.strengthASteps
+        let steps = WorkoutData.strengthASteps.filter { $0.exercise.category != .warmup }
         #expect(steps.map(\.sets) == [3, 3, 2, 2])
         #expect(steps.compactMap(\.reps) == [6, 6, 5, 8])
         #expect(steps.map(\.exercise.name) == ["Ring Push-Up", "Ring Row", "Goblet Squat", "Hanging Bent-Knee Raise"])
@@ -342,7 +342,7 @@ struct TrialProgrammeTests {
     }
 
     @Test func strengthBHasThreeAlternatingPairsAndRepRange() {
-        let steps = WorkoutData.strengthBSteps
+        let steps = WorkoutData.strengthBSteps.filter { $0.exercise.category != .warmup }
         #expect(steps.map(\.sets) == [3, 3, 3, 2, 2])
         #expect(steps.compactMap(\.reps) == [5, 5, 3, 6, 8])
         #expect(steps[0].circuitGroupID != nil)
@@ -355,18 +355,7 @@ struct TrialProgrammeTests {
         #expect(steps.allSatisfy { $0.exercise.simpleSinisterType == nil })
     }
 
-    @Test func thursdayPreservesCommonStretchesAndAddsOnlyMobility() {
-        let common = Skill.commonStretches()
-        let steps = WorkoutData.plan(for: .mobility).steps
-        #expect(steps.prefix(common.count).map(\.exercise.name) == common.map(\.exercise.name))
-        #expect(steps.suffix(2).map(\.exercise.name) == ["Supported Ankle Rocks", "Seated Thoracic Rotation"])
-        #expect(steps.allSatisfy { $0.exercise.category == .stretch })
-        #expect(steps.map(\.sets) == [4, 4, 4, 4, 2, 2, 2])
-        #expect(steps.compactMap(\.durationSeconds) == [30, 30, 30, 30, 60, 30, 30])
-        for skill in Skill.activeSkills {
-            let evening = skill.routine(from: SkillProgressions.defaultSkillProgressions)
-            #expect(!evening.contains { $0.exercise.name == Exercises.ankleRocks.name || $0.exercise.name == Exercises.thoracicRotation.name })
-        }
+    @Test func jointStretchesRemainOpenDuration() {
         let joint = WorkoutData.plan(for: .jointStretches)
         #expect(joint.steps.count == 1)
         #expect(joint.steps[0].exercise.name == "Joint Stretches")

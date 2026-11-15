@@ -140,6 +140,67 @@ struct WorkoutPosition: Equatable {
     }
 }
 
+/// Pure navigation shared by normal completion and confirmed exercise skipping.
+enum WorkoutNavigation {
+    static func nextPosition(in plan: SessionPlan, from position: WorkoutPosition,
+                             skipped: Set<UUID> = []) -> WorkoutPosition {
+        guard plan.steps.indices.contains(position.stepIndex) else {
+            return WorkoutPosition(stepIndex: plan.steps.count, round: 1, phase: .done)
+        }
+        let step = plan.steps[position.stepIndex]
+        if let group = step.circuitGroupID {
+            let remaining = plan.steps.indices.filter {
+                plan.steps[$0].circuitGroupID == group && !skipped.contains(plan.steps[$0].id)
+            }
+            if let next = remaining.first(where: { $0 > position.stepIndex && plan.steps[$0].sets >= position.round }) {
+                return WorkoutPosition(stepIndex: next, round: position.round, phase: .exercise)
+            }
+            if let first = remaining.first(where: { plan.steps[$0].sets > position.round }) {
+                return WorkoutPosition(stepIndex: first, round: position.round + 1, phase: .exercise)
+            }
+        } else if !skipped.contains(step.id), position.round < step.sets {
+            return WorkoutPosition(stepIndex: position.stepIndex, round: position.round + 1, phase: .exercise)
+        }
+        let groupEnd = step.circuitGroupID.flatMap { group in
+            plan.steps.lastIndex { $0.circuitGroupID == group }
+        } ?? position.stepIndex
+        let next = plan.steps.indices.first { $0 > groupEnd && !skipped.contains(plan.steps[$0].id) }
+        return WorkoutPosition(stepIndex: next ?? plan.steps.count, round: 1, phase: next == nil ? .done : .exercise)
+    }
+}
+
+enum WorkoutLogging {
+    static func kettlebellLoad(for step: WorkoutStep, settings: WCSyncPayload,
+                              setNumber: Int) -> (weight: Double, isProgression: Bool)? {
+        guard let type = step.exercise.simpleSinisterType else { return nil }
+        let isTGU = type == .tgu
+        let count = isTGU ? settings.tguProgressionSetCount : settings.swingProgressionSetCount
+        let bounded = min(max(count, 0), step.sets) / 2 * 2
+        let middle = step.sets >= 4 ? Array(3...step.sets) : []
+        let first = step.sets > 0 ? Array(1...min(step.sets, 2)) : []
+        let progression = (middle + first).prefix(bounded).contains(setNumber)
+        let weight = progression
+            ? (isTGU ? settings.tguProgressionWeightKg : settings.swingProgressionWeightKg)
+            : (isTGU ? settings.currentTGUWeightKg : settings.currentSwingWeightKg)
+        return (weight, progression)
+    }
+
+    static func quickSet(for step: WorkoutStep, duration: Int?, strengthWeight: Double?,
+                         settings: WCSyncPayload, setNumber: Int, side: TGUSide?) -> CompletedSet? {
+        guard !step.recordsDifficulty else { return nil }
+        let isTimed = step.exercise.setType == .timed
+        let reps = step.reps ?? step.exercise.defaultReps ?? 10
+        guard isTimed ? (duration ?? 0) > 0 : reps > 0 else { return nil }
+        if step.strengthLoadKey != nil {
+            guard let strengthWeight, WorkoutData.strengthWeights.contains(strengthWeight) else { return nil }
+        }
+        let weight = kettlebellLoad(for: step, settings: settings, setNumber: setNumber)?.weight
+            ?? (step.strengthLoadKey != nil ? strengthWeight : nil)
+        return CompletedSet(reps: isTimed ? nil : reps, durationSeconds: isTimed ? duration : nil,
+                            tguSide: side, weightKg: weight)
+    }
+}
+
 @MainActor
 @Observable
 final class WatchActiveWorkoutStore {
@@ -148,6 +209,7 @@ final class WatchActiveWorkoutStore {
     var activePlan: SessionPlan?
     var position = WorkoutPosition.start()
     var completedExercises: [UUID: CompletedExercise] = [:]
+    var skippedStepIDs: Set<UUID> = []
     var nextTGUSide: TGUSide = .left
     var currentSetStartedAt: Date?
     var currentPreSetHeartRate: Double?
@@ -161,6 +223,7 @@ final class WatchActiveWorkoutStore {
             activePlan = plan
             position = .start()
             completedExercises = [:]
+            skippedStepIDs = []
             nextTGUSide = .left
             currentSetStartedAt = nil
             currentPreSetHeartRate = nil
@@ -173,6 +236,7 @@ final class WatchActiveWorkoutStore {
         activePlan = nil
         position = .start()
         completedExercises = [:]
+        skippedStepIDs = []
         nextTGUSide = .left
         currentSetStartedAt = nil
         currentPreSetHeartRate = nil
@@ -198,10 +262,15 @@ struct WorkoutGuideView: View {
     
     @State private var strengthLoad: Double?
     @State private var showSetLogger  = false
+    @State private var showGuidance = false
+    @State private var showLoggedSets = false
     @State private var showPauseMenu  = false
     @State private var showEndConfirm = false
-    @State private var showSummary    = false
-    @State private var summaryExercises: [CompletedExercise] = []
+    @State private var showSkipConfirm = false
+    @State private var showSkipRestConfirm = false
+    @State private var showResetTimerConfirm = false
+    @State private var restartTimerAfterConfirm = false
+    @State private var summary: WorkoutSummarySnapshot?
     @State private var isStarting     = false
     @State private var isFinishing = false
     @State private var scrollProxy: ScrollViewProxy? = nil
@@ -238,6 +307,10 @@ struct WorkoutGuideView: View {
     
     private var workoutStarted: Bool {
         activeWorkout.workoutStarted || sessionManager.isRunning
+    }
+
+    private var hasLoggedActivity: Bool {
+        completedExercises.values.contains { $0.sets.contains(where: \.hasCompletedActivity) }
     }
     
     // MARK: Helpers
@@ -278,14 +351,8 @@ struct WorkoutGuideView: View {
     
     var body: some View {
         Group {
-            if showSummary {
-                WorkoutSummaryView(
-                    plan: plan,
-                    completedExercises: summaryExercises,
-                    activeCalories: sessionManager.activeCalories,
-                    avgHeartRate: sessionManager.averageHeartRate,
-                    elapsedSeconds: sessionManager.elapsedSeconds
-                )
+            if let summary {
+                WorkoutSummaryView(summary: summary)
             } else {
                 mainBody
             }
@@ -299,15 +366,25 @@ struct WorkoutGuideView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Color.clear.frame(height: 0).id("top")
                     
-                    switch position.phase {
-                    case .exercise:
-                        if let step = currentStep { exercisePhase(step: step) }
-                    case .hrRest:
-                        if let step = currentStep { hrRestPhase(step: step) }
-                    case .timedRest:
-                        if let step = currentStep { timedRestPhase(step: step) }
-                    case .done:
+                    if position.phase == .done {
                         finishingView
+                    } else if sessionManager.isPaused {
+                        Text("Workout paused").font(.headline)
+                        Button("Resume workout") { sessionManager.resumeWorkout() }
+                            .buttonStyle(.borderedProminent)
+                        Button("End workout") { showEndConfirm = true }
+                            .buttonStyle(.bordered)
+                    } else {
+                        switch position.phase {
+                        case .exercise:
+                            if let step = currentStep { exercisePhase(step: step) }
+                        case .hrRest:
+                            if let step = currentStep { hrRestPhase(step: step) }
+                        case .timedRest:
+                            if let step = currentStep { timedRestPhase(step: step) }
+                        case .done:
+                            finishingView
+                        }
                     }
                 }
                 .padding()
@@ -338,30 +415,58 @@ struct WorkoutGuideView: View {
             Button("End Workout", role: .destructive) { showEndConfirm = true }
             Button("Cancel", role: .cancel) {}
         }
-        .alert("End workout?", isPresented: $showEndConfirm) {
-            Button("End & Save", role: .destructive) {
+        .alert(isJointStretches ? "Finish mobility?" : "End workout early?", isPresented: $showEndConfirm) {
+            Button("Keep going", role: .cancel) {}
+            Button(isJointStretches || hasLoggedActivity ? "End & Save" : "Discard workout", role: .destructive) {
                 if isJointStretches, let step = currentStep {
                     handleSetLogged(set: CompletedSet(durationSeconds: max(1, sessionManager.elapsedSeconds)), for: step)
                 } else { finishWorkout() }
             }
-            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Logged activity will be saved. A session with no completed activity will be discarded.")
+            Text(isJointStretches || hasLoggedActivity
+                 ? "Your logged activity will be saved. Any unfinished exercises will remain unlogged."
+                 : "No activity has been logged. This workout will be discarded.")
+        }
+        .alert("Skip this exercise?", isPresented: $showSkipConfirm) {
+            Button("Keep going", role: .cancel) {}
+            Button("Skip exercise", role: .destructive) { skipStep() }
+        } message: {
+            Text("Skip the remaining sets of \(currentStep?.exercise.name ?? "this exercise")? Sets already logged are kept. Other circuit exercises will stay in the workout.")
+        }
+        .alert("Skip this rest?", isPresented: $showSkipRestConfirm) {
+            Button("Keep resting", role: .cancel) {}
+            Button("Skip rest", role: .destructive) {
+                guard position.phase == .timedRest, let step = currentStep else { return }
+                stopRestTimer()
+                advanceAfterRest(step: step)
+            }
+        } message: {
+            Text("Move to the next set now? Only continue when recovered.")
+        }
+        .alert(restartTimerAfterConfirm ? "Start a new attempt?" : "Reset this timer?", isPresented: $showResetTimerConfirm) {
+            Button("Keep timer", role: .cancel) { restartTimerAfterConfirm = false }
+            Button(restartTimerAfterConfirm ? "Start new attempt" : "Reset timer", role: .destructive) {
+                let restart = restartTimerAfterConfirm
+                restartTimerAfterConfirm = false
+                resetExerciseTimer()
+                if restart, let step = currentStep {
+                    startPrepCountdown(target: step.durationSeconds ?? step.exercise.defaultDuration ?? 30)
+                }
+            }
+        } message: {
+            Text("The elapsed time for this set will be cleared. Log the current attempt first if you want to keep it. Logged sets are kept.")
         }
         .onChange(of: currentStep?.id, initial: true) { _, _ in
+            showGuidance = false
+            showLoggedSets = false
             strengthLoad = currentStep?.strengthLoadKey.flatMap { AppGroupDefaults.shared.strengthLoad(for: $0) }
+                .flatMap { WorkoutData.strengthWeights.contains($0) ? $0 : nil }
+        }
+        .onChange(of: sessionManager.isPaused) { _, paused in
+            if paused && (exerciseTimerRunning || prepCountdownSeconds > 0) { freezeExerciseTimer() }
         }
         .navigationBarBackButtonHidden(workoutStarted)
         .toolbar {
-#if DEBUG
-            if !isJointStretches {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { AudioCue.shared.speak("Ready") } label: {
-                        Image(systemName: "speaker.wave.2")
-                    }
-                }
-            }
-#endif
             if workoutStarted {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showPauseMenu = true } label: {
@@ -386,10 +491,10 @@ struct WorkoutGuideView: View {
             let posInCircuit = (circuit.firstIndex(where: { $0.id == step.id }) ?? 0) + 1
             Label("Round \(position.round)/\(step.sets) · Ex \(posInCircuit)/\(circuit.count)",
                   systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
-            .font(.caption2).foregroundStyle(.secondary)
+            .font(.caption2).foregroundStyle(WatchAppearance.supportingText)
         } else if !isJointStretches {
             Text("Set \(position.round) of \(step.sets)")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.caption2).foregroundStyle(WatchAppearance.supportingText)
         }
         
         if !isJointStretches { categoryBadge(step.exercise.category) }
@@ -400,7 +505,7 @@ struct WorkoutGuideView: View {
                 Text(step.exercise.name).font(.headline)
                 Text("· \(nextTGUSide.label)")
                     .font(.headline)
-                    .foregroundStyle(nextTGUSide == .left ? .blue : .orange)
+                    .foregroundStyle(nextTGUSide == .left ? .cyan : .orange)
             }
             .fixedSize(horizontal: false, vertical: true)
         } else {
@@ -410,7 +515,7 @@ struct WorkoutGuideView: View {
         }
         
         Text(step.displayTarget)
-            .font(.subheadline).foregroundStyle(Color.accentColor)
+            .font(.headline).foregroundStyle(.white)
         
         if let kettlebellSetDescription = kettlebellSetDescription(
             for: step,
@@ -423,12 +528,14 @@ struct WorkoutGuideView: View {
         
         if step.strengthLoadKey != nil {
             Picker("Load", selection: $strengthLoad) {
-                Text("Choose comfortable load").tag(Optional<Double>.none)
+                Text("Choose load").tag(Optional<Double>.none)
                 ForEach(WorkoutData.strengthWeights, id: \.self) { weight in
                     Text(formatWeight(weight)).tag(Optional(weight))
                 }
             }
             .font(.caption)
+            .pickerStyle(.wheel)
+            .frame(height: 80)
             .onChange(of: strengthLoad) { _, weight in
                 if let key = step.strengthLoadKey, let weight {
                     AppGroupDefaults.shared.saveStrengthLoad(weight, for: key)
@@ -439,46 +546,6 @@ struct WorkoutGuideView: View {
         if step.exercise.setType == .timed && !isJointStretches {
             exerciseTimerView(step: step)
         }
-        
-        if step.exercise.category == .kettlebell, let last = lastKBWeight(for: step) {
-            Label("Last: \(formatWeight(last))", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        
-        if let notes = step.exercise.notes, !isJointStretches {
-            Text(notes)
-                .font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        
-        if let notes = step.notes {
-            Text(notes).font(.caption2).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-
-        // Logged sets this exercise
-        let logged = completedExercises[step.id]?.sets ?? []
-        if !logged.isEmpty {
-            Divider()
-            ForEach(logged.indices, id: \.self) { i in
-                HStack {
-                    if let side = logged[i].tguSide {
-                        Text("Set \(i+1) \(side.label)").font(.caption2).foregroundStyle(.secondary)
-                    } else {
-                        Text("Set \(i+1)").font(.caption2).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if let r = logged[i].reps            { Text("\(r) reps").font(.caption2) }
-                    if let d = logged[i].durationSeconds { Text("\(d)s").font(.caption2)     }
-                    if recordsDifficulty(for: step) {
-                        Text(logged[i].feltDifficulty.emoji).font(.caption2)
-                    }
-                }
-            }
-        }
-        
-        if workoutStarted { Divider(); liveMetrics }
         
         VStack(spacing: 8) {
             if !workoutStarted {
@@ -494,28 +561,87 @@ struct WorkoutGuideView: View {
             else {
                 Button {
                     if isJointStretches {
-                        handleSetLogged(set: CompletedSet(durationSeconds: max(1, sessionManager.elapsedSeconds)), for: step)
-                        return
+                        showEndConfirm = true
+                    } else if let set = WorkoutLogging.quickSet(for: step,
+                        duration: timedLogDuration(for: step), strengthWeight: strengthLoad,
+                        settings: settings, setNumber: position.round, side: isTGU ? nextTGUSide : nil) {
+                        if step.exercise.setType == .timed { freezeExerciseTimer() }
+                        handleSetLogged(set: set, for: step)
+                    } else {
+                        presentSetLogger(for: step)
                     }
-                    TrainingHaptic.setStart()
-                    setLoggerSuggestedDuration = timedLogDuration(for: step)
-                    if step.exercise.setType == .timed {
-                        freezeExerciseTimer()
-                    }
-                    showSetLogger = true
                 } label: {
                     Label(isJointStretches ? "Finish" : logButtonTitle(for: step), systemImage: "checkmark.circle").frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 
                 if !isJointStretches {
-                    Button { skipStep() } label: {
-                        Label("Skip", systemImage: "forward.fill").frame(maxWidth: .infinity)
+                    if !step.recordsDifficulty {
+                        Button("Adjust set") { presentSetLogger(for: step) }
+                            .buttonStyle(.bordered)
+                    }
+                    Button { showSkipConfirm = true } label: {
+                        Label("Skip exercise", systemImage: "forward.fill").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                 }
             }
         }
+
+        if step.exercise.category == .kettlebell, let last = lastKBWeight(for: step) {
+            Label("Last: \(formatWeight(last))", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                .font(.caption2)
+                .foregroundStyle(WatchAppearance.supportingText)
+        }
+
+        if (!isJointStretches && step.exercise.notes != nil) || step.notes != nil {
+            Button { showGuidance.toggle() } label: {
+                Label(showGuidance ? "Hide guidance" : "Guidance", systemImage: showGuidance ? "chevron.up" : "chevron.down")
+            }.font(.caption).buttonStyle(.bordered)
+            if showGuidance {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let notes = step.exercise.notes, !isJointStretches {
+                        Text(notes).fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let notes = step.notes {
+                        Text(notes).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(WatchAppearance.supportingText)
+            }
+        }
+
+        // Logged sets this exercise
+        let logged = completedExercises[step.id]?.sets ?? []
+        if !logged.isEmpty {
+            Button { showLoggedSets.toggle() } label: {
+                Label("Logged sets (\(logged.count))", systemImage: showLoggedSets ? "chevron.up" : "chevron.down")
+            }.font(.caption).buttonStyle(.bordered)
+            if showLoggedSets {
+                VStack {
+                    ForEach(logged.indices, id: \.self) { i in
+                        HStack {
+                            if let side = logged[i].tguSide {
+                                Text("Set \(i+1) \(side.label)").font(.caption2).foregroundStyle(WatchAppearance.supportingText)
+                            } else {
+                                Text("Set \(i+1)").font(.caption2).foregroundStyle(WatchAppearance.supportingText)
+                            }
+                            Spacer()
+                            if let r = logged[i].reps            { Text("\(r) reps").font(.caption2) }
+                            if let d = logged[i].durationSeconds { Text("\(d)s").font(.caption2)     }
+                            if recordsDifficulty(for: step) {
+                                Text(logged[i].feltDifficulty.emoji).font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .font(.caption)
+            }
+        }
+
+
+        if workoutStarted { Divider(); liveMetrics }
     }
     
     // MARK: - HR rest phase
@@ -550,13 +676,13 @@ struct WorkoutGuideView: View {
                     Text("Set \(position.round) / \(step.sets)")
                 }
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WatchAppearance.supportingText)
 
                 if let pre = completedSet?.preSetHeartRate,
                    let peak {
                     Text("Pre \(Int(pre)) · excursion +\(Int(max(0, peak - pre))) bpm")
                         .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WatchAppearance.supportingText)
                 }
                 
                 nextExerciseView(after: step)
@@ -577,9 +703,12 @@ struct WorkoutGuideView: View {
         VStack(spacing: 1) {
             Text(value)
                 .font(.title2.bold().monospacedDigit())
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            Label {
+                Text(label).foregroundStyle(WatchAppearance.supportingText)
+            } icon: {
+                Image(systemName: "heart.fill").foregroundStyle(.red)
+            }
+            .font(.caption2)
         }
         .frame(maxWidth: .infinity)
     }
@@ -601,8 +730,7 @@ struct WorkoutGuideView: View {
             nextExerciseView(after: step)
             if workoutStarted { liveMetrics }
             Button {
-                stopRestTimer()
-                advanceAfterRest(step: step)
+                showSkipRestConfirm = true
             } label: {
                 Label("Skip Rest", systemImage: "forward.fill").frame(maxWidth: .infinity)
             }
@@ -614,7 +742,7 @@ struct WorkoutGuideView: View {
     private var finishingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("Saving…").font(.caption).foregroundStyle(.secondary)
+            Text("Saving…").font(.caption).foregroundStyle(WatchAppearance.supportingText)
         }
         .onAppear { finishWorkout() }
     }
@@ -634,17 +762,29 @@ struct WorkoutGuideView: View {
     }
     
     private var workoutElapsed: some View {
-        Label(formatWorkoutDuration(sessionManager.elapsedSeconds), systemImage: "clock")
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
+        Label {
+            Text(formatWorkoutDuration(sessionManager.elapsedSeconds))
+                .foregroundStyle(WatchAppearance.supportingText)
+        } icon: {
+            Image(systemName: "clock").foregroundStyle(.cyan)
+        }
+        .font(.caption.monospacedDigit())
     }
     
     private var liveMetrics: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Label("\(Int(sessionManager.heartRate)) bpm", systemImage: "heart.fill").foregroundStyle(.red)
+                Label {
+                    Text("\(Int(sessionManager.heartRate)) bpm").foregroundStyle(.white)
+                } icon: {
+                    Image(systemName: "heart.fill").foregroundStyle(.red)
+                }
                 Spacer()
-                Label("\(Int(sessionManager.activeCalories)) kcal", systemImage: "flame.fill").foregroundStyle(.orange)
+                Label {
+                    Text("\(Int(sessionManager.activeCalories)) kcal").foregroundStyle(.white)
+                } icon: {
+                    Image(systemName: "flame.fill").foregroundStyle(.orange)
+                }
             }
         }
         .font(.caption2.monospacedDigit())
@@ -662,15 +802,16 @@ struct WorkoutGuideView: View {
         Text(label)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 6).padding(.vertical, 2)
-            .background(color.opacity(0.25)).foregroundStyle(color)
+            .background(color.opacity(0.25)).foregroundStyle(.white)
             .clipShape(Capsule())
     }
     
     private func logButtonTitle(for step: WorkoutStep) -> String {
-        guard step.exercise.setType == .timed, let duration = timedLogDuration(for: step) else {
-            return "Log Set"
+        if step.recordsDifficulty { return "Log set & effort" }
+        if step.exercise.setType == .timed {
+            return timedLogDuration(for: step).map { "Log \($0)s" } ?? "Log duration"
         }
-        return "Log \(duration)s"
+        return "Log \(step.reps ?? step.exercise.defaultReps ?? 10) reps"
     }
     
     private func timedLogDuration(for step: WorkoutStep) -> Int? {
@@ -679,7 +820,7 @@ struct WorkoutGuideView: View {
     }
     
     private func recordsDifficulty(for step: WorkoutStep) -> Bool {
-        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics || step.strengthLoadKey != nil
+        step.recordsDifficulty
     }
     
     @ViewBuilder
@@ -700,44 +841,39 @@ struct WorkoutGuideView: View {
                 }
             }
             .font(.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(WatchAppearance.supportingText)
             .multilineTextAlignment(.center)
         } else {
             Text("Next: Done")
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WatchAppearance.supportingText)
         }
     }
     
     private func kettlebellSetDescription(for step: WorkoutStep, setNumber: Int) -> String? {
-        guard let type = step.exercise.simpleSinisterType else { return nil }
-        
-        let isTGU = type == .tgu
-        let progressionSetCount = isTGU
-            ? settings.tguProgressionSetCount
-            : settings.swingProgressionSetCount
-        let boundedProgressionSetCount = min(max(progressionSetCount, 0), step.sets) / 2 * 2
-        let middleSlots = step.sets >= 4 ? Array(3...step.sets) : []
-        let startingSlots = min(step.sets, 2) >= 1 ? Array(1...min(step.sets, 2)) : []
-        let progressionSlots = (middleSlots + startingSlots).prefix(boundedProgressionSetCount)
-        let usesProgressionWeight = progressionSlots.contains(setNumber)
-        let weight = if usesProgressionWeight {
-            isTGU ? settings.tguProgressionWeightKg : settings.swingProgressionWeightKg
-        } else {
-            isTGU ? settings.currentTGUWeightKg : settings.currentSwingWeightKg
-        }
-        
-        return usesProgressionWeight
-            ? "\(formatWeight(weight)) · Progression"
-            : formatWeight(weight)
+        guard let load = WorkoutLogging.kettlebellLoad(for: step, settings: settings, setNumber: setNumber) else { return nil }
+        return load.isProgression ? "\(formatWeight(load.weight)) · Progression" : formatWeight(load.weight)
     }
-    
+
     // MARK: - Navigation
     
-    private func handleSetLogged(set: CompletedSet, for step: WorkoutStep) {
-        TrainingHaptic.setLogged()
+    private func presentSetLogger(for step: WorkoutStep) {
+        setLoggerSuggestedDuration = timedLogDuration(for: step)
+        if step.exercise.setType == .timed { freezeExerciseTimer() }
+        showSetLogger = true
+    }
 
-        if step.strengthLoadKey != nil { strengthLoad = set.weightKg }
+    private func handleSetLogged(set: CompletedSet, for step: WorkoutStep) {
+        guard workoutStarted, position.phase == .exercise, currentStep?.id == step.id else { return }
+        TrainingHaptic.setLogged()
+        if let type = step.exercise.simpleSinisterType, let weight = set.weightKg {
+            WatchConnectivityManager.shared.sendKettlebellEntry(exerciseType: type, weightKg: weight,
+                                                               sets: 1, reps: set.reps ?? 0)
+        }
+        if let key = step.strengthLoadKey, let weight = set.weightKg {
+            strengthLoad = weight
+            AppGroupDefaults.shared.saveStrengthLoad(weight, for: key)
+        }
         var loggedSet = set
         let endDate = Date()
         let startDate = activeWorkout.currentSetStartedAt ?? endDate
@@ -789,7 +925,7 @@ struct WorkoutGuideView: View {
     
     private func isLastRoundOfCircuit(step: WorkoutStep, round: Int) -> Bool {
         guard let gid = step.circuitGroupID else { return false }
-        return plan.steps.filter { $0.circuitGroupID == gid }.last?.id == step.id
+        return plan.steps.filter { $0.circuitGroupID == gid && !activeWorkout.skippedStepIDs.contains($0.id) }.last?.id == step.id
     }
     
     private func circuitEndRest(for step: WorkoutStep) -> Int {
@@ -830,49 +966,19 @@ struct WorkoutGuideView: View {
     }
     
     private func computeNextPosition(after step: WorkoutStep, completing round: Int) -> WorkoutPosition {
-        if let gid = step.circuitGroupID {
-            let circuit         = plan.steps.filter { $0.circuitGroupID == gid }
-            let posInCircuit    = circuit.firstIndex(where: { $0.id == step.id }) ?? 0
-            let isLastInCircuit = posInCircuit == circuit.count - 1
-            let totalRounds     = step.sets
-            
-            if !isLastInCircuit {
-                let nextIdx = plan.steps.firstIndex(where: { $0.id == circuit[posInCircuit + 1].id }) ?? (position.stepIndex + 1)
-                return WorkoutPosition(stepIndex: nextIdx, round: round, phase: .exercise)
-            } else if round < totalRounds {
-                let firstIdx = plan.steps.firstIndex(where: { $0.id == circuit[0].id }) ?? position.stepIndex
-                return WorkoutPosition(stepIndex: firstIdx, round: round + 1, phase: .exercise)
-            } else {
-                return advanceToNextGroup(after: step)
-            }
-        } else {
-            if round < step.sets {
-                return WorkoutPosition(stepIndex: position.stepIndex, round: round + 1, phase: .exercise)
-            } else {
-                return advanceToNextGroup(after: step)
-            }
-        }
+        WorkoutNavigation.nextPosition(in: plan, from: WorkoutPosition(stepIndex: position.stepIndex,
+            round: round, phase: .exercise), skipped: activeWorkout.skippedStepIDs)
     }
-    
-    private func advanceToNextGroup(after step: WorkoutStep) -> WorkoutPosition {
-        var nextIdx = position.stepIndex + 1
-        if let gid = step.circuitGroupID {
-            while nextIdx < plan.steps.count && plan.steps[nextIdx].circuitGroupID == gid { nextIdx += 1 }
-        }
-        if nextIdx >= plan.steps.count {
-            return WorkoutPosition(stepIndex: nextIdx, round: 1, phase: .done)
-        }
-        return WorkoutPosition(stepIndex: nextIdx, round: 1, phase: .exercise)
-    }
-    
-    private func moveToNextStep(from step: WorkoutStep) {
-        position = advanceToNextGroup(after: step)
-        scrollToTop()
-    }
-    
+
     private func skipStep() {
         guard let step = currentStep else { return }
-        position = advanceToNextGroup(after: step)
+        activeWorkout.skippedStepIDs.insert(step.id)
+        stopRestTimer()
+        resetExerciseTimer()
+        activeWorkout.currentSetStartedAt = nil
+        activeWorkout.currentPreSetHeartRate = nil
+        activeWorkout.recoveryStartedAt = nil
+        position = WorkoutNavigation.nextPosition(in: plan, from: position, skipped: activeWorkout.skippedStepIDs)
         scrollToTop()
     }
     
@@ -884,6 +990,7 @@ struct WorkoutGuideView: View {
         restTimer?.invalidate()
         restTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
+                guard self.position.phase == .timedRest, !self.sessionManager.isPaused else { return }
                 if self.restSecondsRemaining > 1 {
                     self.restSecondsRemaining -= 1
                 } else {
@@ -950,24 +1057,27 @@ struct WorkoutGuideView: View {
                             .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(.orange)
                         Text("prep")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .font(.caption2)
+                            .foregroundStyle(WatchAppearance.supportingText)
                     } else {
                         Text(formatTimerDisplay(displaySeconds))
                             .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(displaySeconds >= target ? .green : .primary)
                         Text("/ \(target)s")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .font(.caption2)
+                            .foregroundStyle(WatchAppearance.supportingText)
                     }
                 }
             }
-            .frame(width: 80, height: 80)
+            .frame(width: 96, height: 96)
             
             HStack(spacing: 10) {
                 Button {
                     if exerciseTimerRunning || isPreparing {
                         freezeExerciseTimer()
+                    } else if displaySeconds > 0 {
+                        restartTimerAfterConfirm = true
+                        showResetTimerConfirm = true
                     } else {
                         startPrepCountdown(target: target)
                     }
@@ -978,14 +1088,19 @@ struct WorkoutGuideView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(exerciseTimerRunning || isPreparing ? .orange : .accentColor)
+                .accessibilityLabel(exerciseTimerRunning || isPreparing ? "Stop timer" : displaySeconds > 0 ? "Start new attempt" : "Start timer")
                 
-                Button { resetExerciseTimer() } label: {
+                Button {
+                    restartTimerAfterConfirm = false
+                    showResetTimerConfirm = true
+                } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.caption.bold())
                         .frame(width: 36, height: 28)
                 }
                 .buttonStyle(.bordered)
                 .disabled(displaySeconds == 0 && !exerciseTimerRunning && !isPreparing)
+                .accessibilityLabel("Reset timer")
             }
             
             if isPreparing {
@@ -1011,6 +1126,7 @@ struct WorkoutGuideView: View {
         TrainingHaptic.setStart()
         prepTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
+                guard self.prepCountdownSeconds > 0, !self.sessionManager.isPaused else { return }
                 if self.prepCountdownSeconds > 1 {
                     self.prepCountdownSeconds -= 1
                     TrainingHaptic.setStart()
@@ -1028,6 +1144,7 @@ struct WorkoutGuideView: View {
         TrainingHaptic.setStart()
         exerciseTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             Task { @MainActor in
+                guard self.exerciseTimerRunning, !self.sessionManager.isPaused else { return }
                 self.exerciseTimerSeconds += 1
                 if self.exerciseTimerSeconds == target {
                     TrainingHaptic.restDone()
@@ -1073,6 +1190,11 @@ struct WorkoutGuideView: View {
     // MARK: - Workout lifecycle
     
     private func startWorkout() {
+        let current = AppGroupDefaults.shared.loadAppContext()
+        guard DailyPractice.permitsStart(plan: plan, history: current.trainingHistory, restDays: current.restDays) else {
+            errorState.post("Today is a rest day. Choose Joint Stretches or Evening stretching from home.")
+            return
+        }
         isStarting = true
         Task {
             do {
@@ -1097,7 +1219,9 @@ struct WorkoutGuideView: View {
         guard workoutStarted else { return }
         isFinishing = true
         finalizeHeartRateMetrics()
-        let exercises = plan.steps.compactMap { completedExercises[$0.id] }
+        let finishedPlan = plan
+        let finishedLogs = completedExercises
+        let exercises = finishedPlan.steps.compactMap { finishedLogs[$0.id] }
         guard exercises.contains(where: { $0.sets.contains(where: \.hasCompletedActivity) }) else {
             sessionManager.discardWorkout()
             activeWorkout.markFinished()
@@ -1112,9 +1236,11 @@ struct WorkoutGuideView: View {
             do { hkUUID = try await sessionManager.endWorkout() }
             catch { errorState.post("Error saving HealthKit workout: \(error.localizedDescription)") }
             TrainingHaptic.workoutEnd()
-            summaryExercises = exercises
+            let finishedSummary = WorkoutSummarySnapshot(plan: finishedPlan, loggedExercises: finishedLogs,
+                activeCalories: sessionManager.activeCalories, averageHeartRate: sessionManager.averageHeartRate,
+                elapsedSeconds: sessionManager.elapsedSeconds)
             let workout = CompletedWorkout(
-                sessionType: plan.sessionType, startDate: startedAt, endDate: Date(), exercises: exercises,
+                sessionType: finishedPlan.sessionType, startDate: startedAt, endDate: Date(), exercises: exercises,
                 activeCalories: sessionManager.activeCalories > 0 ? sessionManager.activeCalories : nil,
                 averageHeartRate: sessionManager.averageHeartRate > 0 ? sessionManager.averageHeartRate : nil,
                 peakHeartRate: sessionManager.peakHeartRate > 0 ? sessionManager.peakHeartRate : nil,
@@ -1126,10 +1252,11 @@ struct WorkoutGuideView: View {
                 cached.eveningRotationDay = EveningRotation.nextIndex(after: completion, fallback: cached.eveningRotationDay)
                 AppGroupDefaults.shared.saveAppContext(cached)
             }
-            saveSkillEntries()
+            AppGroupDefaults.shared.recordTrainingCompletion(workout)
+            saveSkillEntries(plan: finishedPlan, loggedExercises: finishedLogs)
             WatchConnectivityManager.shared.sendWorkout(workout)
+            summary = finishedSummary
             activeWorkout.markFinished()
-            showSummary = true
         }
     }
 
@@ -1157,9 +1284,9 @@ struct WorkoutGuideView: View {
         }?.currentLevel
     }
     
-    private func saveSkillEntries() {
+    private func saveSkillEntries(plan: SessionPlan, loggedExercises: [UUID: CompletedExercise]) {
         for step in plan.steps where step.exercise.category == .skillProgression {
-            guard let ex = completedExercises[step.id], ex.sets.contains(where: \.hasCompletedActivity) else { continue }
+            guard let ex = loggedExercises[step.id], ex.sets.contains(where: \.hasCompletedActivity) else { continue }
             guard let progRecord = settings.skillProgressions.first(where: {
                 $0.currentSkillLevel?.name == step.exercise.name
             }) else { continue }
@@ -1189,41 +1316,26 @@ struct SetLoggerView: View {
     @State private var currentReps: Int = 0
     @State private var currentDuration: Int = 0
     @State private var currentDifficulty: DifficultyRating = .moderate
+    @State private var isSubmitting = false
     @State private var settings = AppGroupDefaults.shared.loadAppContext()
     @Environment(\.dismiss) private var dismiss
     
     private var isTimed: Bool { step.exercise.setType == .timed }
     private var isKB: Bool { step.exercise.simpleSinisterType != nil }
     private var recordsDifficulty: Bool {
-        step.exercise.category == .skillProgression || step.exercise.category == .calisthenics || step.strengthLoadKey != nil
+        step.recordsDifficulty
     }
     private var kettlebellExerciseType: KettlebellExerciseType {
         step.exercise.simpleSinisterType ?? .swing
     }
     private var usesProgressionWeight: Bool {
-        progressionSetSlots(totalSets: step.sets, progressionSetCount: progressionSetCount)
-            .contains(existingSets.count + 1)
+        WorkoutLogging.kettlebellLoad(for: step, settings: settings, setNumber: existingSets.count + 1)?.isProgression ?? false
     }
-    
-    private var progressionSetCount: Int {
-        let count = kettlebellExerciseType == .tgu
-            ? settings.tguProgressionSetCount
-            : settings.swingProgressionSetCount
-        return evenProgressionSetCount(count)
-    }
-    
+
     private var kettlebellWeightKg: Double {
-        if usesProgressionWeight {
-            return kettlebellExerciseType == .tgu
-                ? settings.tguProgressionWeightKg
-                : settings.swingProgressionWeightKg
-        }
-        
-        return kettlebellExerciseType == .tgu
-            ? settings.currentTGUWeightKg
-            : settings.currentSwingWeightKg
+        WorkoutLogging.kettlebellLoad(for: step, settings: settings, setNumber: existingSets.count + 1)?.weight ?? 0
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(spacing: 10) {
@@ -1235,7 +1347,7 @@ struct SetLoggerView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         Text("· \(side.label)")
                             .font(.headline)
-                            .foregroundStyle(side == .left ? .blue : .orange)
+                            .foregroundStyle(side == .left ? .cyan : .orange)
                     }
                 } else {
                     Text(step.exercise.name)
@@ -1244,22 +1356,24 @@ struct SetLoggerView: View {
                 }
                 
                 Text("Set \(existingSets.count + 1) of \(step.sets)")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(WatchAppearance.supportingText)
                 
                 if step.strengthLoadKey != nil {
                     Picker("Load", selection: $selectedStrengthWeight) {
-                        Text("Choose comfortable load").tag(Optional<Double>.none)
+                        Text("Choose load").tag(Optional<Double>.none)
                         ForEach(WorkoutData.strengthWeights, id: \.self) { weight in
                             Text(formatWeight(weight)).tag(Optional(weight))
                         }
                     }
                     .font(.caption)
+                    .pickerStyle(.wheel)
+                    .frame(height: 80)
                 }
                 if isKB {
                     HStack {
                         Label("Weight", systemImage: "scalemass")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(WatchAppearance.supportingText)
                         Spacer()
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(formatWeight(kettlebellWeightKg))
@@ -1289,7 +1403,7 @@ struct SetLoggerView: View {
                 
                 if recordsDifficulty {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Effort").font(.caption2).foregroundStyle(.secondary)
+                        Text("Effort").font(.caption2).foregroundStyle(WatchAppearance.supportingText)
                         Picker("", selection: $currentDifficulty) {
                             ForEach(DifficultyRating.allCases, id: \.self) { d in
                                 Text("\(d.emoji) \(d.label)").tag(d)
@@ -1300,6 +1414,8 @@ struct SetLoggerView: View {
                 }
                 
                 Button("Log Set") {
+                    guard !isSubmitting else { return }
+                    isSubmitting = true
                     let s = CompletedSet(
                         reps: isTimed ? nil : currentReps,
                         durationSeconds: isTimed ? currentDuration : nil,
@@ -1307,22 +1423,11 @@ struct SetLoggerView: View {
                         tguSide: tguSide,
                         weightKg: isKB ? kettlebellWeightKg : (step.strengthLoadKey != nil ? selectedStrengthWeight : nil)
                     )
-                    if isKB {
-                        WatchConnectivityManager.shared.sendKettlebellEntry(
-                            exerciseType: kettlebellExerciseType,
-                            weightKg: kettlebellWeightKg,
-                            sets: 1,
-                            reps: currentReps
-                        )
-                    }
-                    if let key = step.strengthLoadKey, let weight = selectedStrengthWeight {
-                        AppGroupDefaults.shared.saveStrengthLoad(weight, for: key)
-                    }
                     onComplete(s)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
-                .disabled((step.strengthLoadKey != nil && selectedStrengthWeight == nil) || (isTimed ? currentDuration <= 0 : currentReps <= 0))
+                .disabled(isSubmitting || (step.strengthLoadKey != nil && selectedStrengthWeight == nil) || (isTimed ? currentDuration <= 0 : currentReps <= 0))
 
                 if !existingSets.isEmpty {
                     Divider()
@@ -1346,17 +1451,8 @@ struct SetLoggerView: View {
         .onAppear {
             settings = AppGroupDefaults.shared.loadAppContext()
             selectedStrengthWeight = step.strengthLoadKey.flatMap { AppGroupDefaults.shared.strengthLoad(for: $0) }
+                .flatMap { WorkoutData.strengthWeights.contains($0) ? $0 : nil }
         }
-    }
-    
-    private func evenProgressionSetCount(_ value: Int) -> Int {
-        min(max(value, 0), step.sets) / 2 * 2
-    }
-    
-    private func progressionSetSlots(totalSets: Int, progressionSetCount: Int) -> [Int] {
-        let middleSlots = totalSets >= 4 ? Array(3...totalSets) : []
-        let startingSlots = min(totalSets, 2) >= 1 ? Array(1...min(totalSets, 2)) : []
-        return Array((middleSlots + startingSlots).prefix(evenProgressionSetCount(progressionSetCount)))
     }
     
     private func formatWeight(_ kg: Double) -> String {
@@ -1391,3 +1487,15 @@ struct SetLoggerView: View {
             .environment(ErrorState())
     }
 }
+
+#if DEBUG
+#Preview("Strength set adjustment") {
+    SetLoggerView(step: WorkoutData.strengthBSteps.first { $0.strengthLoadKey == "cleanPress" }!,
+                  round: 1, existingSets: [], tguSide: nil, suggestedDurationSeconds: nil) { _ in }
+}
+
+#Preview("Skill effort") {
+    SetLoggerView(step: WorkoutData.plan(for: .evening).steps.first { $0.recordsDifficulty }!,
+                  round: 1, existingSets: [], tguSide: nil, suggestedDurationSeconds: 20) { _ in }
+}
+#endif

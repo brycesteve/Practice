@@ -6,6 +6,100 @@
 //
 
 public enum Exercises {
+    // Shared timed movements for the evening stretch and Thursday mobility sequences.
+    private static func stretch(_ name: String, notes: String? = nil) -> Exercise {
+        Exercise(name: name, category: .stretch, setType: .timed, defaultSets: 1,
+                 defaultDuration: 30, notes: notes)
+    }
+
+    public static let hipOpeners = stretch("Hip Openers", notes: "Move gently between hip positions.")
+    public static let gluteStretchLeft = stretch("90/90 Glute Stretch — Left Leg")
+    public static let backLegLiftsRight = stretch("90/90 Back Leg Lifts — Right Leg", notes: "Lift and lower the back leg with control.")
+    public static let ninetySeatedTwist = stretch("90/90 Seated Twist", notes: "Turn gently through the upper back.")
+    public static let ninetyGoodMorningsLeft = stretch("90/90 Good Mornings — Left Leg", notes: "Hinge forward over the front leg with control.")
+    public static let gluteStretchRight = stretch("90/90 Glute Stretch — Right Leg")
+    public static let backLegLiftsLeft = stretch("90/90 Back Leg Lifts — Left Leg", notes: "Lift and lower the back leg with control.")
+    public static let ninetyGoodMorningsRight = stretch("90/90 Good Mornings — Right Leg", notes: "Hinge forward over the front leg with control.")
+    public static let catCow = stretch("Cat/Cow", notes: "Move slowly between comfortable spinal positions.")
+    public static let forearmStretch = stretch("Forearm Stretch")
+    public static let puppyDog = stretch("Puppy Dog Stretch")
+    public static let shoulderRolls = stretch("Shoulder Rolls", notes: "Roll smoothly in both directions.")
+    public static let downwardDog = stretch("Downward Dog Stretch", notes: "Let the heels lower gently to stretch the calves; they do not need to reach the floor.")
+    public static let kneelingQuadLeft = stretch("Kneeling Quad Stretch — Left Leg Forward")
+    public static let lizardLeft = stretch("Lizard Stretch — Left Leg Forward")
+    public static let pigeonLeft = stretch("Pigeon Stretch — Left Leg Forward")
+    public static let kneelingQuadRight = stretch("Kneeling Quad Stretch — Right Leg Forward")
+    public static let lizardRight = stretch("Lizard Stretch — Right Leg Forward")
+    public static let pigeonRight = stretch("Pigeon Stretch — Right Leg Forward")
+    public static let frogStretch = stretch("Frog Stretch")
+    public static let pancakeStretch = stretch("Seated Pancake Stretch")
+    public static let pancakeSideLeft = stretch("Pancake Side Stretch — Left Foot")
+    public static let pancakeSideRight = stretch("Pancake Side Stretch — Right Foot")
+    public static let standingPike = stretch("Standing Pike Stretch")
+    public static let deepSquatHold = stretch("Deep Squat Hold", notes: "Use a comfortable depth and support as needed.")
+    public static let seatedBicepStretch = stretch("Seated Bicep Stretch")
+    public static let lyingTwistLeft = stretch("Lying Twist — Left Leg Across")
+    public static let lyingTwistRight = stretch("Lying Twist — Right Leg Across")
+    public static let happyBaby = stretch("Happy Baby Stretch")
+    public static let kneelingTSpineRotation = stretch("Kneeling T-Spine Rotation", notes: "Alternate sides within the interval.")
+    public static let hipRocking = stretch("Hip Rocking — Feet Turned Out", notes: "Rock slowly through a comfortable range.")
+    public static let downDogCalfPedal = stretch("Down Dog Calf Pedal", notes: "Alternate gently lowering each heel to stretch the calves.")
+    public static let spinalWaves = stretch("Spinal Waves", notes: "Move smoothly without forcing the range.")
+    public static let adductorRocksLeft = stretch("Half Kneeling Adductor Rocks — Left Foot Out")
+    public static let frogThreadLeft = stretch("Half Frog Thread the Needle — Left Leg Straight", notes: "Move the right arm.")
+    public static let adductorRocksRight = stretch("Half Kneeling Adductor Rocks — Right Foot Out")
+    public static let frogThreadRight = stretch("Half Frog Thread the Needle — Right Leg Straight", notes: "Move the left arm.")
+    public static let standingPancakeWalks = stretch("Standing Pancake Walks", notes: "Move side to side.")
+    public static let pancakeShoulder = stretch("Pancake Shoulder Stretch")
+    public static let toeStand = stretch("Toe Stand", notes: "Lift the heels with control; use support if needed.")
+    public static let camelBridges = stretch("Camel Bridges", notes: "Alternate sides within the interval.")
+    public static let activeCrabBicep = stretch("Active Crab Bicep Stretch")
+    public static let proneAngels = stretch("Prone Angels", notes: "Move the arms with control.")
+    public static let proneScorpions = stretch("Prone Scorpions", notes: "Alternate sides within the interval.")
+    public static let birdDogLeft = stretch("Bird Dog — Left Hand & Right Leg", notes: "Lift and lower with control.")
+    public static let hipFlexorRocksRight = stretch("Kneeling Hip Flexor Rocks — Right Leg Forward")
+    public static let birdDogRight = stretch("Bird Dog — Right Hand & Left Leg", notes: "Lift and lower with control.")
+    public static let hipFlexorRocksLeft = stretch("Kneeling Hip Flexor Rocks — Left Leg Forward")
+    public static let hipCARsLeft = stretch("Kneeling Hip CARs — Left Leg", notes: "Slow controlled hip circles; keep the trunk steady.")
+    public static let hipCARsRight = stretch("Kneeling Hip CARs — Right Leg", notes: "Slow controlled hip circles; keep the trunk steady.")
+    public static let activeStandingPike = stretch("Standing Pike Stretch — Hands Off Floor")
+    public static let lyingHipCirclesRight = stretch("Lying Hip Circles — Right Leg")
+    public static let lyingLegExtensionsRight = stretch("Lying Leg Extensions — Right Leg")
+    public static let lyingHipCirclesLeft = stretch("Lying Hip Circles — Left Leg")
+    public static let lyingLegExtensionsLeft = stretch("Lying Leg Extensions — Left Leg")
+    public static let bridgeHold = stretch("Bridge Hold", notes: "Use your comfortable bridge variation; do not force the backbend.")
+
+
+    public static let armCircles = Exercise(
+        name: "Arm Circles", category: .warmup, defaultSets: 1, defaultReps: 20,
+        notes: "10 forward, 10 backward."
+    )
+    public static let shoulderRotations = Exercise(
+        name: "Shoulder Rotations", category: .warmup, defaultSets: 1, defaultReps: 20,
+        notes: "10 each direction. Move comfortably."
+    )
+    public static let bodyweightSquat = Exercise(
+        name: "Bodyweight Squat", category: .warmup, defaultSets: 1, defaultReps: 10,
+        notes: "10 comfortable reps."
+    )
+    // Separate warm-up variants keep preparation distinct in completed-workout history.
+    public static let easyRingPushUp = Exercise(
+        name: "Easy Ring Push-Up", category: .warmup, defaultSets: 1, defaultReps: 5,
+        notes: "Use an easier angle than your working sets. Keep all 5 reps easy."
+    )
+    public static let easyRingRow = Exercise(
+        name: "Easy Ring Row", category: .warmup, defaultSets: 1, defaultReps: 5,
+        notes: "Use an easier angle than your working sets. Keep all 5 reps easy."
+    )
+    public static let lightClean = Exercise(
+        name: "Light Kettlebell Clean", category: .warmup, defaultSets: 2, defaultReps: 3,
+        notes: "3 per side: first set left, second set right. Choose a comfortably light kettlebell for preparation."
+    )
+    public static let lightPress = Exercise(
+        name: "Light Kettlebell Press", category: .warmup, defaultSets: 2, defaultReps: 3,
+        notes: "3 per side: first set left, second set right. Choose a comfortably light kettlebell for pressing preparation; do not infer it from swing or get-up weight."
+    )
+
     public static let ringPushUp = Exercise(
         name: "Ring Push-Up", category: .calisthenics, defaultReps: 6,
         notes: "Adjust ring height and body position. Controlled reps; leave 2–3 reps in reserve."

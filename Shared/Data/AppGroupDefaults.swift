@@ -31,6 +31,22 @@ struct AppGroupDefaults {
     func saveAppContext(_ data: WCSyncPayload) {
         var data = data
 #if os(watchOS)
+        let cached = loadAppContext()
+        if (data.trainingHistoryUpdatedAt ?? .distantPast) < (cached.trainingHistoryUpdatedAt ?? .distantPast) {
+            data.trainingHistory = cached.trainingHistory
+            data.trainingHistoryUpdatedAt = cached.trainingHistoryUpdatedAt
+        }
+        let isPhoneSnapshot = data.trainingHistoryUpdatedAt != cached.trainingHistoryUpdatedAt
+        let pendingIDs = Set(pendingTrainingCompletions().map(\.id))
+        if !isPhoneSnapshot {
+            let authoritativeIDs = Set(authoritativeTrainingHistory().map(\.id))
+            data.trainingHistory.removeAll { pendingIDs.contains($0.id) && !authoritativeIDs.contains($0.id) }
+        }
+        let confirmedIDs = Set(data.trainingHistory.map(\.id))
+        let pending = pendingTrainingCompletions().filter { !confirmedIDs.contains($0.id) }
+        if let encoded = try? JSONEncoder().encode(pending) {
+            defaults?.set(encoded, forKey: "pendingTrainingCompletions")
+        }
         // Preserve a just-completed offline Watch session until the phone catches up.
         if let local = loadAppContext().lastEveningCompletion,
            local.date > (data.lastEveningCompletion?.date ?? .distantPast) {
@@ -44,17 +60,38 @@ struct AppGroupDefaults {
     }
     
     func loadAppContext() -> WCSyncPayload {
-        guard let data = defaults?.data(forKey: "appContext"),
-              let decoded = try? JSONDecoder().decode(WCSyncPayload.self, from: data) else {
-            return WCSyncPayload()
-        }
-        
-        var value = decoded
+        var value = defaults?.data(forKey: "appContext")
+            .flatMap { try? JSONDecoder().decode(WCSyncPayload.self, from: $0) } ?? WCSyncPayload()
+#if os(watchOS)
+        let ids = Set(value.trainingHistory.map(\.id))
+        value.trainingHistory = DailyPractice.ordered(value.trainingHistory + pendingTrainingCompletions().filter { !ids.contains($0.id) })
+#endif
         if let recovery = value.recoveryData, !RecoveryAggregation.isConsistent(recovery) { value.recoveryData = nil }
         value.eveningRotationDay = EveningRotation.nextIndex(after: value.lastEveningCompletion, fallback: value.eveningRotationDay)
         return value
     }
     
+    private func authoritativeTrainingHistory() -> [TrainingCompletion] {
+        guard let data = defaults?.data(forKey: "appContext"),
+              let context = try? JSONDecoder().decode(WCSyncPayload.self, from: data) else { return [] }
+        return context.trainingHistory
+    }
+
+    private func pendingTrainingCompletions() -> [TrainingCompletion] {
+        guard let data = defaults?.data(forKey: "pendingTrainingCompletions") else { return [] }
+        return (try? JSONDecoder().decode([TrainingCompletion].self, from: data)) ?? []
+    }
+
+    func recordTrainingCompletion(_ workout: CompletedWorkout) {
+        let cached = loadAppContext()
+        guard !cached.trainingHistory.contains(where: { $0.id == workout.id }),
+              let completion = DailyPractice.completion(for: workout, history: cached.trainingHistory,
+            progressions: cached.skillProgressions + SkillProgressions.defaultSkillProgressions) else { return }
+        var pending = pendingTrainingCompletions().filter { $0.id != completion.id }
+        pending.append(completion)
+        if let data = try? JSONEncoder().encode(pending) { defaults?.set(data, forKey: "pendingTrainingCompletions") }
+    }
+
     func updateRestDays(_ days: [Date]) {
         var data = loadAppContext()
         data.updateRestDays(days)

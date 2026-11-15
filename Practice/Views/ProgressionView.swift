@@ -113,6 +113,8 @@ struct SkillRowView: View {
 struct SkillDetailView: View {
     let record: SkillProgressionRecord
     @Environment(\.modelContext) private var modelContext
+    @Environment(ErrorState.self) private var errorState
+    @State private var pendingLevel: Int?
     @Query private var allHistory: [SkillSessionRecord]
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
     
@@ -149,6 +151,25 @@ struct SkillDetailView: View {
         }
         .navigationTitle(record.skillName)
         .navigationBarTitleDisplayMode(.large)
+        .alert("Change skill level?", isPresented: Binding(
+            get: { pendingLevel != nil }, set: { if !$0 { pendingLevel = nil } })) {
+            Button("Keep current level", role: .cancel) { pendingLevel = nil }
+            Button("Change level") {
+                guard let level = pendingLevel else { return }
+                let previous = record.currentLevel
+                record.currentLevel = level
+                do {
+                    try modelContext.save()
+                    NotificationCenter.default.post(name: .watchRequestedSync, object: nil)
+                } catch {
+                    record.currentLevel = previous
+                    errorState.post("Could not change skill level: \(error.localizedDescription)")
+                }
+                pendingLevel = nil
+            }
+        } message: {
+            Text("Change \(record.skillName) from level \(record.currentLevel) to level \(pendingLevel ?? record.currentLevel)? This changes the exercise offered on your Watch.")
+        }
     }
     
     // MARK: Recommendation banner
@@ -211,8 +232,7 @@ struct SkillDetailView: View {
     private var progressionControls: some View {
         HStack(spacing: 12) {
             Button {
-                record.currentLevel = max(1, record.currentLevel - 1)
-                try? modelContext.save()
+                pendingLevel = max(1, record.currentLevel - 1)
             } label: {
                 Label("Step Back", systemImage: "arrow.down.circle")
                     .frame(maxWidth: .infinity)
@@ -221,8 +241,7 @@ struct SkillDetailView: View {
             .disabled(record.currentLevel <= 1)
             
             Button {
-                record.currentLevel = min(record.levels.count, record.currentLevel + 1)
-                try? modelContext.save()
+                pendingLevel = min(record.levels.count, record.currentLevel + 1)
             } label: {
                 Label("Advance", systemImage: "arrow.up.circle")
                     .frame(maxWidth: .infinity)

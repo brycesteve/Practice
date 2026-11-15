@@ -2,7 +2,14 @@ import Foundation
 import SwiftData
 
 extension WorkoutRecord {
-    var isMeaningfulTraining: Bool { toCompletedWorkout().isMeaningfulTraining }
+    var isMeaningfulTraining: Bool {
+        let exercises = exercises ?? []
+        let isLegacySeed = endDate.timeIntervalSince(startDate) < 1 && activeCalories == 100 && averageHeartRate == 100
+            && !exercises.isEmpty && exercises.allSatisfy { $0.exerciseName == "Test" }
+        return endDate > startDate && !isLegacySeed && exercises.contains {
+            ($0.sets ?? []).contains { ($0.reps ?? 0) > 0 || ($0.durationSeconds ?? 0) > 0 }
+        }
+    }
 }
 
 extension RecoveryScoreRecord {
@@ -12,7 +19,8 @@ extension RecoveryScoreRecord {
 @MainActor
 enum TrainingHistoryIntegrity {
     static func latestEvening(in context: ModelContext) -> EveningCompletion? {
-        let workouts = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
+        let evening = SessionType.evening.rawValue
+        let workouts = (try? context.fetch(FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.sessionTypeRaw == evening }))) ?? []
         let entries = (try? context.fetch(FetchDescriptor<SkillSessionRecord>())) ?? []
         let progressions = (try? context.fetch(FetchDescriptor<SkillProgressionRecord>())) ?? []
         return EveningRotation.latest(workouts: workouts.map { $0.toCompletedWorkout() },

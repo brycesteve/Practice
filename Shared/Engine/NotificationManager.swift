@@ -12,6 +12,8 @@ public final class NotificationManager: Sendable {
         static let morningReminder  = "morning.reminder"
         static let eveningReminder  = "evening.reminder"
         static let weighInReminder  = "weighin.reminder"
+        static let waistReminder = "progress.waist.reminder"
+        static let photoReminder = "progress.photo.reminder"
         static func milestone(_ name: String) -> String { "milestone.\(name)" }
         static func progression(_ skill: String) -> String { "progression.\(skill)" }
     }
@@ -31,21 +33,12 @@ public final class NotificationManager: Sendable {
     // MARK: - Training reminders
     
     public func scheduleMorningReminder(hour: Int, minute: Int) {
-        // Replace the legacy daily S&S reminder with weekday-specific prescriptions.
         center.removePendingNotificationRequests(withIdentifiers: [ID.morningReminder] + morningScheduleIDs)
-        for weekday in 2...7 {
-            guard let type = WorkoutData.scheduledSession(weekday: weekday) else { continue }
-            let content = UNMutableNotificationContent()
-            content.title = type.displayName
-            switch type {
-            case .morning: content.body = "Warm-up, 100 swings and 10 alternating get-ups. Rest until recovered."
-            case .strengthA, .strengthB: content.body = "Your strength session is ready on the Watch. Leave 2–3 reps in reserve."
-            default: content.body = "Your common stretching sequence is ready."
-            }
-            content.sound = .default
-            schedule(content: content, id: "\(ID.morningReminder).\(weekday)", hour: hour,
-                     minute: minute, weekday: weekday, repeats: true)
-        }
+        let content = UNMutableNotificationContent()
+        content.title = "Today's practice"
+        content.body = "Open your Watch for your next session or recovery day. Your programme follows completed sessions."
+        content.sound = .default
+        schedule(content: content, id: ID.morningReminder, hour: hour, minute: minute, repeats: true)
     }
 
     private var morningScheduleIDs: [String] { (2...7).map { "\(ID.morningReminder).\($0)" } }
@@ -53,7 +46,7 @@ public final class NotificationManager: Sendable {
     public func scheduleEveningReminder(hour: Int, minute: Int, skillFocus: String) {
         let content = UNMutableNotificationContent()
         content.title = "🌙 Evening Session"
-        content.body  = "Tonight: \(skillFocus). Time to build your foundation."
+        content.body  = "Open your Watch for \(skillFocus), or gentle stretching on a rest day."
         content.sound = .default
         schedule(content: content, id: ID.eveningReminder, hour: hour, minute: minute, repeats: true)
     }
@@ -85,6 +78,50 @@ public final class NotificationManager: Sendable {
         center.removePendingNotificationRequests(withIdentifiers: [ID.weighInReminder])
     }
     
+    // MARK: - Private progress reminders
+
+    public enum ProgressReminder: String, Sendable {
+        case waist, photos
+        public var identifier: String {
+            switch self {
+            case .waist: return ID.waistReminder
+            case .photos: return ID.photoReminder
+            }
+        }
+    }
+
+    public static func progressReminderComponents(_ reminder: ProgressReminder, day: Int,
+                                                  hour: Int, minute: Int) throws -> DateComponents {
+        guard (0...23).contains(hour), (0...59).contains(minute),
+              (reminder == .waist ? (1...7).contains(day) : (1...28).contains(day)) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        var components = DateComponents()
+        components.hour = hour
+        components.minute = minute
+        if reminder == .waist { components.weekday = day }
+        else { components.day = day }
+        return components
+    }
+
+    /// Stable identifiers replace pending requests, so edits never accumulate reminders.
+    public func scheduleProgressReminder(_ reminder: ProgressReminder, day: Int, hour: Int, minute: Int) async throws {
+        let components = try Self.progressReminderComponents(reminder, day: day, hour: hour, minute: minute)
+        let content = UNMutableNotificationContent()
+        content.title = reminder == .waist ? "Weekly Waist Measurement" : "Monthly Progress Photos"
+        content.body = reminder == .waist
+            ? "Take a waist measurement and log it in Practice."
+            : "Your next photo session is ready in Practice."
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: reminder.identifier, content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: true))
+        try await center.add(request)
+    }
+
+    public func cancelProgressReminder(_ reminder: ProgressReminder) {
+        center.removePendingNotificationRequests(withIdentifiers: [reminder.identifier])
+    }
+
     // MARK: - Milestone notifications (immediate delivery)
     
     public func notifyKettlebellMilestone(exerciseType: KettlebellExerciseType, weightKg: Double, isFinalGoal: Bool) {
@@ -120,7 +157,7 @@ public final class NotificationManager: Sendable {
     
     public func cancelAllReminders() {
         center.removePendingNotificationRequests(withIdentifiers: [
-            ID.morningReminder, ID.eveningReminder, ID.weighInReminder
+            ID.morningReminder, ID.eveningReminder, ID.weighInReminder, ID.waistReminder, ID.photoReminder
         ] + morningScheduleIDs)
     }
     

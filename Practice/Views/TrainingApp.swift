@@ -65,11 +65,20 @@ struct TrainingApp: App {
             if PracticeExecution.isTesting { return }
             if phase == .active {
                 BackgroundTaskManager.shared.scheduleNextRefresh()
+                Task { await refreshProgressReminders() }
             }
             
         }
     }
     
+    @MainActor
+    private func refreshProgressReminders() async {
+        do {
+            let enabled = try container.mainContext.fetch(FetchDescriptor<AppSettings>()).first?.notificationsEnabled ?? true
+            try await ProgressReminderSettings.rescheduleAll(masterEnabled: enabled)
+        } catch { errorState.post("Progress reminders could not be scheduled: \(error.localizedDescription)") }
+    }
+
     private func onLaunch() async {
         do { try await HealthKitManager.shared.requestAuthorization() }
         catch { errorState.post("HealthKit authorisation failed. Practice measurements can still be saved.") }

@@ -225,7 +225,8 @@ struct BodyCompositionTests {
 
     @Test func ageUsesBirthdayNotJustYear() throws {
         var configuration = BodyConfiguration()
-        configuration.dateOfBirth = try #require(Calendar.current.date(from: DateComponents(year: 1979, month: 10, day: 15)))
+        let birthday = try #require(Calendar.current.date(from: DateComponents(year: 1979, month: 10, day: 15)))
+        configuration.dateOfBirth = birthday
         let before = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 14)))
         let after = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 10, day: 15)))
         #expect(configuration.fallbackProfile(at: before).age == 46)

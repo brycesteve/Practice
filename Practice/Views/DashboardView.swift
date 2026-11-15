@@ -22,15 +22,27 @@ struct DashboardView: View {
     @State private var latestVO2Max: Double?   = nil
     @State private var recoveryScore: RecoveryScore? = nil
     @State private var showEveningPreview = false
+    @State private var showProgressPhotos = false
     @State private var path = NavigationPath()
     
     private var allWorkouts: [WorkoutRecord] { storedWorkouts.filter(\.isMeaningfulTraining) }
     @Query private var skillSessions: [SkillSessionRecord]
     private var eveningRotationDay: Int {
-        let completion = EveningRotation.latest(workouts: allWorkouts.map { $0.toCompletedWorkout() },
+        let completion = EveningRotation.latest(workouts: storedWorkouts.filter { $0.sessionTypeRaw == SessionType.evening.rawValue }.map { $0.toCompletedWorkout() },
             entries: skillSessions.map { $0.toSkillSessionEntry() },
             progressions: progressionRecords.map { $0.toSkillProgression() } + SkillProgressions.defaultSkillProgressions)
         return EveningRotation.nextIndex(after: completion, fallback: settings.eveningRotationDay)
+    }
+
+    private var trainingHistory: [TrainingCompletion] {
+        DailyPractice.history(workouts: allWorkouts.map { $0.toCompletedWorkout() },
+                              progressions: progressionRecords.map { $0.toSkillProgression() } + SkillProgressions.defaultSkillProgressions)
+    }
+    private var resting: Bool {
+        DailyPractice.isResting(history: trainingHistory, restDays: restDays.map(\.date), on: programmeDate)
+    }
+    private var suggestedSession: SessionType? {
+        DailyPractice.suggestedSession(history: trainingHistory, restDays: restDays.map(\.date), on: programmeDate)
     }
 
     private var settings: AppSettings { settingsResults.first ?? AppSettings() }
@@ -64,7 +76,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                LazyVStack(alignment: .leading, spacing: 20) {
                     
                     // Header
                     VStack(alignment: .leading, spacing: 4) {
@@ -73,11 +85,17 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
-                    TodayProgrammeView(type: WorkoutData.scheduledSession(on: programmeDate))
+                    TodayProgrammeView(type: suggestedSession)
+                    NavigationLink {
+                        ProgrammeLibraryView(progressions: progressionRecords.map { $0.toSkillProgression() })
+                    } label: {
+                        Label("Browse all sessions & exercises", systemImage: "list.bullet")
+                    }
+                    .padding(.horizontal)
 
                     // Today
                     if !todayWorkouts.isEmpty { todayCard }
-                    else if WorkoutData.scheduledSession(on: programmeDate) != nil { noWorkoutCard }
+                    else if suggestedSession != nil { noWorkoutCard }
                     
                     // Recovery card
                     recoveryCard
@@ -89,16 +107,42 @@ struct DashboardView: View {
                     weeklyStreak
                     
                     // Tonight's skill
-                    upcomingSkillCard
+                    if resting {
+                        CardView {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Evening stretching").font(.headline)
+                                Text("Gentle stretching is available on your Watch. Your next skill will wait until after recovery.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    } else {
+                        upcomingSkillCard
+                    }
                     
                     // Main stats
                     statsGrid
                     
+                    // Private progress photography
+                    Button { showProgressPhotos = true } label: {
+                        CardView {
+                            HStack(spacing: 14) {
+                                Image(systemName: "photo.on.rectangle.angled").font(.title).foregroundStyle(.teal)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Progress").font(.headline)
+                                    Text("Your photographs, over time").font(.subheadline).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }.buttonStyle(.plain)
+
                     // Body stats
                     bodyStatsSection
                 }
                 .padding(.vertical)
                 .task {
+                    guard !PracticeExecution.isTesting else { return }
                     async let weight = HealthKitManager.shared.fetchLatestBodyMass()
                     async let vo2 = HealthKitManager.shared.fetchLatestVO2Max()
                     latestWeightKg = try? await weight
@@ -112,6 +156,7 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
                 programmeDate = .now
             }
+            .fullScreenCover(isPresented: $showProgressPhotos) { ProgressPhotosView() }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Route.self) { route in
@@ -550,7 +595,7 @@ struct DashboardView: View {
             let isFuture = date > today
             let worked  = allWorkouts.contains { cal.isDate($0.startDate, inSameDayAs: date) }
             let rested  = restDays.contains    { cal.isDate($0.date,      inSameDayAs: date) }
-                || WorkoutData.scheduledSession(on: date, calendar: cal) == nil
+                || DailyPractice.requiresRest(history: trainingHistory, on: date, calendar: cal)
             let label   = cal.shortWeekdaySymbols[cal.component(.weekday, from: date) - 1]
             let state: DayState = isFuture ? .future : worked ? .trained : rested ? .rest : .missed
             return DaySummary(date: date, label: label, state: state)
@@ -608,7 +653,7 @@ private struct TodayProgrammeView: View {
     var body: some View {
         CardView {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Today's programme").font(.caption).foregroundStyle(.secondary)
+                Text("Next practice").font(.caption).foregroundStyle(.secondary)
                 if let type {
                     Text(type.displayName).font(.headline)
                     ForEach(WorkoutData.plan(for: type).steps) { step in
@@ -618,6 +663,9 @@ private struct TodayProgrammeView: View {
                             if let notes = step.exercise.notes {
                                 Text(notes).font(.caption2).foregroundStyle(.secondary)
                             }
+                            if let notes = step.notes {
+                                Text(notes).font(.caption2).foregroundStyle(.secondary)
+                            }
                         }
                     }
                     if type == .strengthA || type == .strengthB {
@@ -625,14 +673,71 @@ private struct TodayProgrammeView: View {
                     }
                 } else {
                     Text("Rest").font(.headline)
-                    Text("No scheduled strength training.").font(.caption)
+                    Text("Recovery today. Gentle mobility and stretching are available.").font(.caption)
                 }
                 Text("Morning: Joint Stretches · at your own pace")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("Record sessions on your Watch.").font(.caption2).foregroundStyle(.secondary)
+                Text("Record or choose another session on your Watch. Missed days leave your next practice waiting.").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+/// Read-only access to the same prescriptions offered by the Watch, including manual choices.
+struct ProgrammeLibraryView: View {
+    let progressions: [SkillProgression]
+
+    var body: some View {
+        List {
+            Section("Main sessions") {
+                ForEach([SessionType.morning, .strengthA, .strengthB, .mobility], id: \.self) { type in
+                    NavigationLink(type.displayName) {
+                        SessionPlanPreviewView(plan: WorkoutData.plan(for: type), title: type.displayName)
+                    }
+                }
+            }
+            Section("Daily mobility & recovery") {
+                NavigationLink("Joint Stretches") {
+                    SessionPlanPreviewView(plan: WorkoutData.plan(for: .jointStretches), title: "Joint Stretches")
+                }
+                NavigationLink("Evening stretching") {
+                    SessionPlanPreviewView(plan: WorkoutData.restEveningPlan, title: "Evening stretching")
+                }
+            }
+            Section("Evening skills") {
+                ForEach(Skill.activeSkills, id: \.rawValue) { skill in
+                    NavigationLink(skill.rawValue) {
+                        SessionPlanPreviewView(plan: WorkoutData.eveningPlan(for: skill, progressions: progressions),
+                                               title: skill.rawValue)
+                    }
+                }
+            }
+        }
+        .navigationTitle("Sessions & exercises")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct SessionPlanPreviewView: View {
+    let plan: SessionPlan
+    let title: String
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(plan.steps) { step in
+                    ExercisePreviewRow(step: step)
+                }
+            } footer: {
+                Text("Preview only. Choose and record your session on your Watch.")
+            }
+            if plan.sessionType == .strengthA || plan.sessionType == .strengthB {
+                Section { Text(WorkoutData.strengthGuidance).font(.caption) }
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -646,4 +751,8 @@ private struct TodayProgrammeView: View {
 
 #Preview("Sunday rest") {
     TodayProgrammeView(type: nil)
+}
+
+#Preview("All sessions") {
+    NavigationStack { ProgrammeLibraryView(progressions: SkillProgressions.defaultSkillProgressions) }
 }

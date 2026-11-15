@@ -31,6 +31,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "AA5389AD2DE2083D008CA062"
                BuildableName = "Practice.app"
+               BlueprintName = "Practice"
                ReferencedContainer = "container:Practice.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -62,6 +63,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA5389AD2DE2083D008CA062"
             BuildableName = "Practice.app"
+            BlueprintName = "Practice"
             ReferencedContainer = "container:Practice.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -97,6 +99,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "AA5389AD2DE2083D008CA062"
             BuildableName = "Practice.app"
+            BlueprintName = "Practice"
             ReferencedContainer = "container:Practice.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

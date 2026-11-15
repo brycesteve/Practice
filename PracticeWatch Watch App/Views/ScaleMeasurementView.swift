@@ -33,7 +33,11 @@ struct ScaleMeasurementView: View {
                     Text("Step off before starting another measurement.").font(.footnote)
                 }
                 if let error = controller.saveError {
-                    Text(error).foregroundStyle(.red)
+                    Label {
+                        Text(error).foregroundStyle(.white)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    }
                     Button("Retry save") { controller.retrySave() }
                 }
                 ForEach(controller.discovered) { device in
@@ -57,7 +61,7 @@ struct ScaleMeasurementView: View {
                         .font(.footnote)
                 }
                 Text("Keep this screen open. Stand barefoot for impedance.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(WatchAppearance.supportingText)
                 if !outbox.pending.isEmpty {
                     Button("Retry iPhone sync (\(outbox.pending.count))") {
                         WatchConnectivityManager.shared.flushBodyMeasurements()

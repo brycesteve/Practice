@@ -126,6 +126,9 @@ public struct WorkoutStep: Identifiable, Codable, Sendable {
     public var repUpperBound: Int?
     public var strengthLoadKey: String?
 
+    /// Only progression skill sets use effort to inform subsequent recommendations.
+    public var recordsDifficulty: Bool { exercise.category == .skillProgression }
+
     public var displayTarget: String {
         if let reps, let repUpperBound { return "\(sets) × \(reps)–\(repUpperBound) reps" }
         if exercise.setType == .timed && durationSeconds == nil && exercise.defaultDuration == nil {

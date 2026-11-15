@@ -25,14 +25,7 @@ public struct EveningPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var plan: SessionPlan {
-        SessionPlan(
-            sessionType: .evening,
-            steps: WorkoutData.eveningSteps(
-                rotationDay: rotationDay,
-                progressions: progressions
-            ),
-            estimatedDurationMinutes: 60
-        )
+        WorkoutData.plan(for: .evening, rotationDay: rotationDay, progressions: progressions)
     }
 
     private var skillNames = Skill.activeSkills.map { $0.rawValue }
@@ -191,22 +184,27 @@ struct ExercisePreviewRow: View {
             // Circuit indicator
             if step.circuitGroupID != nil {
                 Label("Circuit", systemImage: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // Notes if present
             if let notes = step.exercise.notes {
                 Text(notes)
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(2)
+                    .foregroundStyle(.secondary)
+            }
+            if let notes = step.notes {
+                Text(notes).font(.caption2).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
     }
 
     private var targetDescription: String {
+        if step.repUpperBound != nil || (step.exercise.setType == .timed && step.durationSeconds == nil && step.exercise.defaultDuration == nil) {
+            return step.displayTarget
+        }
         if let reps = step.reps {
             return "\(step.sets) × \(reps) reps"
         } else if let dur = step.durationSeconds {
@@ -224,7 +222,7 @@ struct ExercisePreviewRow: View {
         let (label, color): (String, Color) = switch step.exercise.category {
         case .warmup:           ("Warm-up",  .yellow)
         case .skillProgression: ("Skill",    .purple)
-        case .calisthenics:     ("Assist",   .blue)
+        case .calisthenics:     ("Bodyweight", .blue)
         case .stretch:          ("Stretch",  .green)
         case .kettlebell:       ("KB",       .orange)
         }

@@ -35,6 +35,8 @@ public enum WCMessageKey {
 public struct WCSyncPayload: Codable, Sendable {
     public var skillProgressions: [SkillProgression]
     var lastEveningCompletion: EveningCompletion? = nil
+    var trainingHistory: [TrainingCompletion] = []
+    var trainingHistoryUpdatedAt: Date? = nil
     public var eveningRotationDay: Int
     public var targetSwingWeightKg: Double
     public var targetTGUWeightKg: Double
@@ -89,6 +91,7 @@ public struct WCSyncPayload: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
         case skillProgressions
         case eveningRotationDay
+        case trainingHistory, trainingHistoryUpdatedAt
         case lastEveningCompletion
         case targetSwingWeightKg
         case targetTGUWeightKg
@@ -109,6 +112,8 @@ public struct WCSyncPayload: Codable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         skillProgressions = try container.decodeIfPresent([SkillProgression].self, forKey: .skillProgressions) ?? []
         eveningRotationDay = try container.decodeIfPresent(Int.self, forKey: .eveningRotationDay) ?? 0
+        trainingHistory = try container.decodeIfPresent([TrainingCompletion].self, forKey: .trainingHistory) ?? []
+        trainingHistoryUpdatedAt = try container.decodeIfPresent(Date.self, forKey: .trainingHistoryUpdatedAt)
         lastEveningCompletion = try container.decodeIfPresent(EveningCompletion.self, forKey: .lastEveningCompletion)
         targetSwingWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetSwingWeightKg) ?? 24
         targetTGUWeightKg = try container.decodeIfPresent(Double.self, forKey: .targetTGUWeightKg) ?? 24

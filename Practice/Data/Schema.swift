@@ -12,6 +12,7 @@
 
 
 import Foundation
+import OSLog
 import SwiftData
 
 // MARK: - Migration
@@ -24,17 +25,21 @@ enum TrainingMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] { [
         TrainingSchemaV1.self,
         TrainingSchemaV2.self,
-        TrainingSchemaV3.self
+        TrainingSchemaV3.self,
+        TrainingSchemaV4.self
     ] }
     static var stages: [MigrationStage] {
         [.lightweight(fromVersion: TrainingSchemaV1.self, toVersion: TrainingSchemaV2.self),
-         .lightweight(fromVersion: TrainingSchemaV2.self, toVersion: TrainingSchemaV3.self)]
+         .lightweight(fromVersion: TrainingSchemaV2.self, toVersion: TrainingSchemaV3.self),
+         .lightweight(fromVersion: TrainingSchemaV3.self, toVersion: TrainingSchemaV4.self)]
     }  // add stages here for future versions
 }
 
 // MARK: - SwiftData Model Aliases
 
-typealias CurrentSchema = TrainingSchemaV3
+typealias CurrentSchema = TrainingSchemaV4
+typealias ProgressPhotoSession = TrainingSchemaV4.ProgressPhotoSession
+typealias ProgressPhotoRecord = TrainingSchemaV4.ProgressPhotoRecord
 typealias BodyMeasurementRecord = TrainingSchemaV3.BodyMeasurementRecord
 typealias WaistMeasurementRecord = TrainingSchemaV3.WaistMeasurementRecord
 typealias BodyProfileSettings = TrainingSchemaV3.BodyProfileSettings
@@ -74,9 +79,13 @@ public extension ModelContainer {
             migrationPlan: TrainingMigrationPlan.self,
             configurations: config
         )
-        Task {
-            try await deduplicateProgressions(container: container)
-            try await ensureDefaultProgressions(container: container)
+        Task { @MainActor in
+            do {
+                try deduplicateProgressions(container: container)
+                try ensureDefaultProgressions(container: container)
+            } catch {
+                Logger.default.error("Failed to prepare skill progressions: \(error.localizedDescription, privacy: .public)")
+            }
         }
         return container
     }

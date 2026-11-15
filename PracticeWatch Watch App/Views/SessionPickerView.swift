@@ -15,7 +15,13 @@ struct SessionPickerView: View {
         settings.restDays.contains { Calendar.current.isDateInToday($0) }
     }
     
-    private var scheduledSession: SessionType? { WorkoutData.scheduledSession(on: programmeDate) }
+    private var forcedRest: Bool {
+        DailyPractice.requiresRest(history: settings.trainingHistory, on: programmeDate)
+    }
+    private var resting: Bool { forcedRest || isRestDayToday }
+    private var scheduledSession: SessionType? {
+        DailyPractice.suggestedSession(history: settings.trainingHistory, restDays: settings.restDays, on: programmeDate)
+    }
     private var offeredSessions: [SessionType] {
         [scheduledSession, .jointStretches, .evening].compactMap { $0 }
     }
@@ -38,10 +44,10 @@ struct SessionPickerView: View {
                     
                     // MARK: - Session Tiles
                     if scheduledSession == nil {
-                        Text("Sunday · Rest")
+                        Text(forcedRest ? "Recovery day" : "Rest day")
                             .font(.headline)
-                        Text("No scheduled strength training.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text(forcedRest ? "Six training days in a row. Take today to recover." : "Gentle movement and stretching today.")
+                            .font(.caption).foregroundStyle(WatchAppearance.supportingText)
                     }
                     ForEach(offeredSessions, id: \.self) { type in
                         NavigationLink(value: type) {
@@ -49,9 +55,30 @@ struct SessionPickerView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(sessionManager.isRunning)
-                        .opacity(sessionManager.isRunning ? 0.45 : 1)
+                        .opacity(sessionManager.isRunning ? 0.65 : 1)
                     }
                     
+                    if !resting {
+                        NavigationLink {
+                            List {
+                                ForEach([SessionType.morning, .strengthA, .mobility, .strengthB], id: \.self) { type in
+                                    NavigationLink(type.displayName) {
+                                        WorkoutGuideView(plan: plan(for: type))
+                                    }
+                                }
+                                Text("The next suggestion follows the session you log. Missed days leave it waiting.")
+                                    .font(.footnote)
+                                    .foregroundStyle(WatchAppearance.supportingText)
+                            }
+                            .navigationTitle("Choose session")
+                        } label: {
+                            Label("Choose another session", systemImage: "list.bullet")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(SecondaryTileStyle(isActive: false))
+                        .disabled(sessionManager.isRunning)
+                    }
+
                     NavigationLink(destination: ScaleMeasurementView()) {
                         HStack {
                             Image(systemName: "scalemass")
@@ -59,7 +86,7 @@ struct SessionPickerView: View {
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(WatchAppearance.supportingText)
                         }
                         .padding(.vertical, 4)
                     }
@@ -74,15 +101,16 @@ struct SessionPickerView: View {
                         } label: {
                             HStack {
                                 Image(systemName: isRestDayToday ? "bed.double.fill" : "bed.double")
-                                Text(isRestDayToday ? "Rest Day Active" : "Mark Rest Day")
+                                Text(forcedRest ? "Recovery day required" : isRestDayToday ? "Rest Day Active" : "Mark Rest Day")
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(WatchAppearance.supportingText)
                             }
                             .padding(.vertical, 4)
                         }
-                        .buttonStyle(SecondaryTileStyle(isActive: isRestDayToday))
+                        .buttonStyle(SecondaryTileStyle(isActive: resting))
+                        .disabled(forcedRest || sessionManager.isRunning)
                         
                         NavigationLink(destination: WatchRecoveryView()) {
                             HStack {
@@ -91,7 +119,7 @@ struct SessionPickerView: View {
                                 Spacer()
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(WatchAppearance.supportingText)
                             }
                             .padding(.vertical, 4)
                         }
@@ -101,16 +129,18 @@ struct SessionPickerView: View {
                     
                     Spacer(minLength: 8)
                     
-                    Text(rotationLabel)
+                    Text(resting ? "Evening: gentle stretching" : rotationLabel)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(WatchAppearance.supportingText)
                 }
                 .padding(.horizontal)
             }
             .navigationTitle("Practice")
             .navigationDestination(for: SessionType.self) { type in
-                if type == .evening {
-                    EveningSessionSelectionView(settings: settings)
+                if type == .evening && resting {
+                    WorkoutGuideView(plan: WorkoutData.restEveningPlan)
+                } else if type == .evening {
+                    EveningSessionSelectionView(settings: settings, programmeDate: programmeDate)
                 } else {
                     WorkoutGuideView(plan: plan(for: type))
                 }
@@ -136,7 +166,7 @@ struct SessionPickerView: View {
     
     @ViewBuilder
     private func resumeTile(for plan: SessionPlan) -> some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: "figure.run.circle.fill")
                 .font(.title2)
                 .foregroundStyle(.green)
@@ -146,8 +176,9 @@ struct SessionPickerView: View {
                 Text("Resume Workout")
                     .font(.caption).fontWeight(.semibold)
                 Text("\(plan.sessionType.displayName) · \(formatDuration(sessionManager.elapsedSeconds))")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(WatchAppearance.supportingText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, 10)
@@ -163,18 +194,21 @@ struct SessionPickerView: View {
     private func sessionTile(for type: SessionType) -> some View {
         let config = sessionConfig(for: type)
         
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: config.icon)
                 .font(.title2)
                 .foregroundStyle(config.tint)
                 .frame(width: 24)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text(type == scheduledSession ? "Today: \(type.displayName)" : type.displayName)
-                    .font(.caption).fontWeight(.semibold)
+                Text(type == scheduledSession ? "Next: \(type.displayName)" : type == .evening && resting ? "Evening stretching" : type.displayName)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(config.subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(WatchAppearance.supportingText)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
         }
@@ -194,11 +228,11 @@ struct SessionPickerView: View {
         case .morning:
             return ("sunrise.fill", .yellow, "Warm-up · 100 swings · 10 get-ups")
         case .evening:
-            return ("moon.stars", .indigo, "Skill & mobility")
+            return ("moon.stars", .cyan, resting ? "Gentle stretching · skill rotation waits" : "Skill & mobility")
         case .strengthA, .strengthB:
             return ("figure.strengthtraining.functional", .orange, "Controlled strength · 2–3 reps in reserve")
         case .mobility:
-            return ("figure.flexibility", .green, "Common stretching sequence")
+            return ("figure.flexibility", .green, "Full-body mobility · bridge holds")
         case .jointStretches:
             return ("figure.mind.and.body", .mint, "Morning mobility · at your own pace")
         }
@@ -245,7 +279,7 @@ struct SessionPickerView: View {
     
     private func plan(for type: SessionType) -> SessionPlan {
         WorkoutData.plan(for: type, rotationDay: settings.eveningRotationDay,
-                         progressions: settings.skillProgressions)
+                         progressions: settings.skillProgressions, on: programmeDate)
     }
 
     // MARK: - Sync
@@ -274,6 +308,7 @@ struct SessionPickerView: View {
 /// Selection changes only this plan. Automatic rotation changes only after logged skill completion.
 private struct EveningSessionSelectionView: View {
     let settings: WCSyncPayload
+    let programmeDate: Date
     @State private var selectedSkill = ""
 
     private var automatic: Skill { Skill.activeSkills[EveningRotation.normalized(settings.eveningRotationDay)] }
@@ -288,11 +323,11 @@ private struct EveningSessionSelectionView: View {
                 }
             }
             NavigationLink("Prepare \(chosen.rawValue)") {
-                WorkoutGuideView(plan: SessionPlan(sessionType: .evening,
-                    steps: chosen.routine(from: settings.skillProgressions), estimatedDurationMinutes: 30))
+                WorkoutGuideView(plan: WorkoutData.eveningPlan(for: chosen,
+                    progressions: settings.skillProgressions, on: programmeDate))
             }
             Text("Your next automatic suggestion follows the skill you actually complete.")
-                .font(.footnote).foregroundStyle(.secondary)
+                .font(.footnote).foregroundStyle(WatchAppearance.supportingText)
         }
         .navigationTitle("Evening skill")
     }

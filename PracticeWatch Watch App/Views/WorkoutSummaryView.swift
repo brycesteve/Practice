@@ -2,15 +2,33 @@
 
 import SwiftUI
 
-struct WorkoutSummaryView: View {
+/// Captured before clearing the active session; picker refreshes cannot change a finished workout.
+struct WorkoutSummarySnapshot {
     let plan: SessionPlan
     let completedExercises: [CompletedExercise]
     let activeCalories: Double
-    let avgHeartRate: Double
+    let averageHeartRate: Double
     let elapsedSeconds: Int
 
+    init(plan: SessionPlan, loggedExercises: [UUID: CompletedExercise], activeCalories: Double,
+         averageHeartRate: Double, elapsedSeconds: Int) {
+        self.plan = plan
+        self.completedExercises = plan.steps.compactMap { loggedExercises[$0.id] }
+        self.activeCalories = activeCalories
+        self.averageHeartRate = averageHeartRate
+        self.elapsedSeconds = elapsedSeconds
+    }
+
+    var loggedExerciseCount: Int {
+        completedExercises.filter { $0.sets.contains(where: \.hasCompletedActivity) }.count
+    }
+}
+
+struct WorkoutSummaryView: View {
+    let summary: WorkoutSummarySnapshot
+
     private var swingSets: [CompletedSet] {
-        completedExercises.first {
+        summary.completedExercises.first {
             $0.exerciseName.localizedCaseInsensitiveContains("swing")
         }?.sets ?? []
     }
@@ -32,33 +50,33 @@ struct WorkoutSummaryView: View {
                 Text("Done! 💪")
                     .font(.title3.bold())
                 
-                Text(plan.sessionType.displayName + " Session")
+                Text(summary.plan.sessionType.displayName + " Session")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WatchAppearance.supportingText)
                 
                 Divider()
                 
                 // Stats
-                statsRow(icon: "clock", label: "Duration", value: formatDuration(elapsedSeconds))
-                statsRow(icon: "flame.fill", label: "Calories", value: "\(Int(activeCalories)) kcal", color: .orange)
-                if avgHeartRate > 0 {
-                    statsRow(icon: "heart.fill", label: "Avg HR", value: "\(Int(avgHeartRate)) bpm", color: .red)
+                statsRow(icon: "clock", label: "Duration", value: formatDuration(summary.elapsedSeconds), color: .cyan)
+                statsRow(icon: "flame.fill", label: "Calories", value: "\(Int(summary.activeCalories)) kcal", color: .orange)
+                if summary.averageHeartRate > 0 {
+                    statsRow(icon: "heart.fill", label: "Avg HR", value: "\(Int(summary.averageHeartRate)) bpm", color: .red)
                 }
                 if let averagePeak = average(swingSets.compactMap(\.peakHeartRate)) {
-                    statsRow(icon: "heart.text.clipboard", label: "Swing peak", value: "\(Int(averagePeak)) bpm")
+                    statsRow(icon: "heart.text.clipboard", label: "Swing peak", value: "\(Int(averagePeak)) bpm", color: .red)
                 }
                 if let averageRecovery = average(swingSets.compactMap(\.recoveryDuration)) {
-                    statsRow(icon: "timer", label: "Avg recovery", value: "\(Int(averageRecovery.rounded())) sec")
+                    statsRow(icon: "timer", label: "Avg recovery", value: "\(Int(averageRecovery.rounded())) sec", color: .mint)
                 }
                 
                 Divider()
                 
-                Text("\(completedExercises.filter { !$0.sets.isEmpty }.count) / \(plan.steps.count) exercises logged")
+                Text("\(summary.loggedExerciseCount) / \(summary.plan.steps.count) exercises logged")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WatchAppearance.supportingText)
                 
                 
-                Button("Back to Home") {
+                Button("Done") {
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -75,12 +93,15 @@ struct WorkoutSummaryView: View {
             Image(systemName: icon)
                 .foregroundStyle(color)
                 .frame(width: 20)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.caption.bold())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(WatchAppearance.supportingText)
+                Text(value)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
         }
     }
     
@@ -103,17 +124,9 @@ struct WorkoutSummaryView: View {
 
 #if DEBUG
 #Preview {
-    WorkoutSummaryView(
-        plan: SessionPlan(
-            sessionType: .morning,
-            steps: WorkoutData.morningSteps,
-            estimatedDurationMinutes: 60
-        ),
-        completedExercises: [],
-        activeCalories: 300,
-        avgHeartRate: 150,
-        elapsedSeconds: 3600
-    )
+    WorkoutSummaryView(summary: WorkoutSummarySnapshot(
+        plan: WorkoutData.plan(for: .morning), loggedExercises: [:],
+        activeCalories: 300, averageHeartRate: 150, elapsedSeconds: 3600))
 }
 
 #endif

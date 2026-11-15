@@ -155,6 +155,17 @@ struct SettingsView: View {
                     NavigationLink("Body profile & scale") { BodyProfileSettingsView() }
                 }
 
+                Section {
+                    ProgressReminderRow(kind: .waist, masterEnabled: settings.notificationsEnabled)
+                } header: {
+                    Label("Weekly Waist Measurement", systemImage: "ruler")
+                }
+                Section {
+                    ProgressReminderRow(kind: .photos, masterEnabled: settings.notificationsEnabled)
+                } header: {
+                    Label("Monthly Progress Photos", systemImage: "camera")
+                }
+
                 // MARK: Weigh-in reminder
                 Section {
                     WeighInReminderRow()

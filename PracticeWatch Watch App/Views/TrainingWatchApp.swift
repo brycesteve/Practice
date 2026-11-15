@@ -36,3 +36,9 @@ struct TrainingWatchApp: App {
         .environment(errorState)
     }
 }
+
+/// Opaque light text keeps supporting information legible when the Watch dims.
+/// Keep hierarchy in font size and spacing rather than fading essential text.
+enum WatchAppearance {
+    static let supportingText = Color(white: 0.85)
+}

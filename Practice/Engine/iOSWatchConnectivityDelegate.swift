@@ -296,6 +296,14 @@ public final class iOSWatchConnectivityDelegate: WatchConnectivityDelegate {
             restDays: restDays,
             bodyConfiguration: (try? BodyMeasurementStore.configuration(in: context)) ?? cached.bodyConfiguration
         )
+        if let records = try? context.fetch(FetchDescriptor<WorkoutRecord>()) {
+            payload.trainingHistory = DailyPractice.history(workouts: records.map { $0.toCompletedWorkout() },
+                                                            progressions: progressions + SkillProgressions.defaultSkillProgressions)
+            payload.trainingHistoryUpdatedAt = Date()
+        } else {
+            payload.trainingHistory = cached.trainingHistory
+            payload.trainingHistoryUpdatedAt = cached.trainingHistoryUpdatedAt
+        }
         payload.lastEveningCompletion = lastEvening
         return payload
     }

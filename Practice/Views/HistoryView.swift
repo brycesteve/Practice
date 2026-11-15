@@ -10,6 +10,8 @@ struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var allWorkouts: [WorkoutRecord]
     @State private var filterType: SessionType? = nil
+    @State private var workoutToDelete: WorkoutRecord?
+    @Environment(ErrorState.self) private var errorState
     
     private var filtered: [WorkoutRecord] {
         guard let f = filterType else { return allWorkouts }
@@ -36,14 +38,23 @@ struct HistoryView: View {
                         NavigationLink(value: workout) {
                             WorkoutRowView(workout: workout)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                delete(workout)
-                            }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("Delete", systemImage: "trash") { workoutToDelete = workout }
+                                .tint(.red)
                         }
                     }
                 }
             }
+        }
+        .alert("Delete this workout?", isPresented: Binding(
+            get: { workoutToDelete != nil }, set: { if !$0 { workoutToDelete = nil } })) {
+            Button("Keep workout", role: .cancel) { workoutToDelete = nil }
+            Button("Delete workout", role: .destructive) {
+                if let workout = workoutToDelete { delete(workout) }
+                workoutToDelete = nil
+            }
+        } message: {
+            Text("This permanently removes the Practice record and its logged sets. This cannot be undone.")
         }
         .navigationTitle("History")
         .navigationDestination(for: WorkoutRecord.self) { workout in
@@ -52,8 +63,17 @@ struct HistoryView: View {
     }
     
     private func delete(_ workout: WorkoutRecord) {
-        modelContext.delete(workout)
-        try? modelContext.save()
+        let id = workout.id
+        let context = ModelContext(modelContext.container)
+        do {
+            if let stored = try context.fetch(FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.id == id })).first {
+                context.delete(stored)
+                try context.save()
+                NotificationCenter.default.post(name: .watchRequestedSync, object: nil)
+            }
+        } catch {
+            errorState.post("Could not delete workout: \(error.localizedDescription)")
+        }
     }
     
     private struct MonthSection: Identifiable {
@@ -64,9 +84,9 @@ struct HistoryView: View {
         let fmt = DateFormatter(); fmt.dateFormat = "MMMM yyyy"
         var dict: [String: [WorkoutRecord]] = [:]
         for w in workouts { dict[fmt.string(from: w.startDate), default: []].append(w) }
-        return dict.keys.sorted().reversed().map { key in
-            MonthSection(key: key, workouts: dict[key]!.sorted { $0.startDate > $1.startDate })
-        }
+        return dict.map { key, workouts in
+            MonthSection(key: key, workouts: workouts.sorted { $0.startDate > $1.startDate })
+        }.sorted { $0.workouts[0].startDate > $1.workouts[0].startDate }
     }
 }
 

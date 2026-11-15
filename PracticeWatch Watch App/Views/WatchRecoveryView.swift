@@ -30,7 +30,7 @@ struct WatchRecoveryView: View {
                         ProgressView()
                         Text("Reading Health…")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(WatchAppearance.supportingText)
                     }
                     .padding(.top, 20)
                     
@@ -74,11 +74,11 @@ struct WatchRecoveryView: View {
                     Text("\(Int(score.overallScore))")
                         .font(.system(size: 20, weight: .bold, design: .rounded))
                     Text("Recovery")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                        .foregroundStyle(WatchAppearance.supportingText)
                 }
             }
-            .frame(width: 80, height: 80)
+            .frame(width: 96, height: 96)
             
             Text(labelFor(score.overallScore))
                 .font(.headline)
@@ -99,10 +99,10 @@ struct WatchRecoveryView: View {
                 metricRow("heart.fill", "Rest HR", String(format: "%.0f bpm", rhr), .red)
             }
             if let sleep = score.sleepHours {
-                metricRow("bed.double.fill", "Sleep", String(format: "%.1f hrs", sleep), .indigo)
+                metricRow("bed.double.fill", "Sleep", String(format: "%.1f hrs", sleep), .cyan)
             }
             if let quality = score.sleepQualityScore {
-                metricRow("moon.zzz.fill", "Sleep Quality", String(format: "%.0f%%", quality), .indigo)
+                metricRow("moon.zzz.fill", "Sleep Quality", String(format: "%.0f%%", quality), .cyan)
             }
             if let resp = score.respiratoryRate {
                 metricRow("lungs.fill", "Resp", String(format: "%.1f/min", resp), .cyan)
@@ -120,9 +120,9 @@ struct WatchRecoveryView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(WatchAppearance.supportingText)
                 Text(value)
-                    .font(.caption2).fontWeight(.semibold)
+                    .font(.headline)
             }
             
             Spacer()
@@ -142,7 +142,7 @@ struct WatchRecoveryView: View {
             
             Text(text)
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(WatchAppearance.supportingText)
                 .fixedSize(horizontal: false, vertical: true)
             
             Spacer()
@@ -183,7 +183,7 @@ struct WatchRecoveryView: View {
     private func scoreColor(_ s: Double) -> Color {
         switch s {
         case 85...: return .green
-        case 70..<85: return .blue
+        case 70..<85: return .cyan
         case 50..<70: return .yellow
         case 30..<50: return .orange
         default: return .red
@@ -201,8 +201,12 @@ struct WatchRecoveryView: View {
     }
     
     private func trainingAdvice(_ s: Double) -> (String, String, Color) {
+        let context = AppGroupDefaults.shared.loadAppContext()
+        if DailyPractice.isResting(history: context.trainingHistory, restDays: context.restDays) {
+            return ("Rest day — gentle movement", "bed.double.fill", .mint)
+        }
         switch s {
-        case 85...: return ("Peak - push hard", "bolt.fill", .green)
+        case 85...: return ("Ready — follow your plan", "bolt.fill", .green)
         case 70..<85: return ("Good — train normally", "checkmark.circle.fill", .blue)
         case 50..<70: return ("Moderate — go lighter", "minus.circle.fill", .yellow)
         case 30..<50: return ("Low — rest or mobility", "exclamationmark.circle.fill", .orange)
